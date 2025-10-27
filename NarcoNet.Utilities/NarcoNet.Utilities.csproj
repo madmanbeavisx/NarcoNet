@@ -216,4 +216,18 @@
         </Reference>
     </ItemGroup>
 
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <PropertyGroup>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+        </PropertyGroup>
+
+        <!-- Create output directory structure -->
+        <MakeDir Directories="$(BuildOutputDir)" />
+
+        <!-- Copy the Utilities DLL -->
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+
+        <Message Text="NarcoNet.Utilities copied to: $(BuildOutputDir)" Importance="high" />
+    </Target>
+
 </Project>
