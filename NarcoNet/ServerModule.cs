@@ -19,7 +19,7 @@ internal class ServerModule(Version pluginVersion)
     }
     catch (Exception e)
     {
-      NarcoPlugin.Logger.LogError($"There was an error getting the {jsonPath} file: {e.Message}");
+      NarcoPlugin.Logger.LogError($"💥 Communication with headquarters failed for {jsonPath}: {e.Message}");
       throw;
     }
   }
@@ -60,11 +60,11 @@ internal class ServerModule(Version pluginVersion)
           case >= 1 and <= 5:
             int retryTime = 2 * retryCount;
             NarcoPlugin.Logger.LogError(
-              $"Failed to download {file}. Retrying in {retryTime} seconds. Retry #{retryCount}/5 ...");
+              $"📦 Package '{file}' got intercepted! Sending another courier in {retryTime} seconds. Attempt #{retryCount}/5 ...");
             break;
           case > 5:
             NarcoPlugin.Logger.LogError(
-              $"There was an error downloading the file {file} after {retryCount} attempts. Please try again later: {e}"
+              $"💀 Lost package '{file}' after {retryCount} attempts. The route is too hot, we need to lay low: {e}"
             );
             throw;
         }
@@ -90,7 +90,7 @@ internal class ServerModule(Version pluginVersion)
   {
     if (paths == null || paths.Count == 0)
     {
-      NarcoPlugin.Logger.LogWarning("GetRemoteHashes called with null or empty paths list");
+      NarcoPlugin.Logger.LogWarning("⚠️ No smuggling routes provided to check inventory!");
       return new Dictionary<string, Dictionary<string, string>>();
     }
 
@@ -109,7 +109,7 @@ internal class ServerModule(Version pluginVersion)
     }
     catch (Exception e)
     {
-      NarcoPlugin.Logger.LogError($"Error getting remote hashes: {e.Message}");
+      NarcoPlugin.Logger.LogError($"💥 Failed to get the boss's inventory: {e.Message}");
       throw;
     }
   }

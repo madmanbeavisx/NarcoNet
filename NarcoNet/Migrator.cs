@@ -38,7 +38,7 @@ public class Migrator(string baseDir)
     }
     catch (Exception e)
     {
-      NarcoPlugin.Logger.LogWarning("Failed to identify previous version. Cleaning up and attempting to continue.");
+      NarcoPlugin.Logger.LogWarning("⚠️ Can't read the old ledger. Burning the evidence and starting fresh...");
       NarcoPlugin.Logger.LogWarning(e);
     }
 
@@ -89,14 +89,14 @@ public class Migrator(string baseDir)
         if (syncPath == null)
         {
           NarcoPlugin.Logger.LogWarning(
-            $"Could not migrate previous sync of '{property.Name}'. Does not match any current sync paths.");
+            $"⚠️ Old route '{property.Name}' is no longer in the smuggling network. Discarding...");
           continue;
         }
 
         JObject modFile = (JObject)property.Value;
         if (!modFile.ContainsKey("crc"))
         {
-          NarcoPlugin.Logger.LogWarning($"Could not migrate previous sync of '{property.Name}'. Does not contain crc.");
+          NarcoPlugin.Logger.LogWarning($"⚠️ Shipment record for '{property.Name}' is damaged. Can't verify the merchandise.");
           continue;
         }
 
@@ -135,7 +135,7 @@ public class Migrator(string baseDir)
     else if (oldVersion.Minor == pluginVersion.Minor && oldVersion != pluginVersion)
     {
       NarcoPlugin.Logger.LogWarning(
-        "Previous sync was made with a different version of the plugin. This may cause issues. Continuing...");
+        "⚠️ The last operation used different procedures. Could cause complications, but we're pushing forward...");
     }
   }
 }

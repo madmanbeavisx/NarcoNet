@@ -82,4 +82,22 @@
         </Reference>
     </ItemGroup>
 
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <PropertyGroup>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+        </PropertyGroup>
+
+        <!-- Create output directory structure -->
+        <MakeDir Directories="$(BuildOutputDir)" />
+
+        <!-- Copy only the main NarcoNet.dll (not dependencies) -->
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+
+        <!-- Copy NarcoNet.UI.dll and NarcoNet.Utilities.dll as they are project dependencies -->
+        <Copy SourceFiles="$(OutDir)NarcoNet.UI.dll" DestinationFolder="$(BuildOutputDir)" Condition="Exists('$(OutDir)NarcoNet.UI.dll')" />
+        <Copy SourceFiles="$(OutDir)NarcoNet.Utilities.dll" DestinationFolder="$(BuildOutputDir)" Condition="Exists('$(OutDir)NarcoNet.Utilities.dll')" />
+
+        <Message Text="Build output copied to: $(BuildOutputDir)" Importance="high" />
+    </Target>
+
 </Project>

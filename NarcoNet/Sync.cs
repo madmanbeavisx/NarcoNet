@@ -169,7 +169,7 @@ public static class Sync
 
     watch.Stop();
     NarcoPlugin.Logger.LogInfo(
-      $"UrGrannyOnFents-NarcoNet: Hashed {processedFiles.Count} files in {watch.Elapsed.TotalMilliseconds}ms");
+      $"🔍 Catalogued {processedFiles.Count} packages in the warehouse in {watch.Elapsed.TotalMilliseconds}ms");
 
     return results;
   }
@@ -187,7 +187,7 @@ public static class Sync
     }
     catch (Exception e)
     {
-      NarcoPlugin.Logger.LogError($"UrGrannyOnFents-NarcoNet: Error hashing '{file}': {e.Message}");
+      NarcoPlugin.Logger.LogError($"💥 Error verifying package '{file}': {e.Message}");
       hash = "";
     }
 

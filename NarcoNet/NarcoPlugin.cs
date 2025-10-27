@@ -71,7 +71,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
   private SyncPathFileList _addedFiles = [];
   private ConfigEntry<bool>? _configDeleteRemovedFiles;
 
-  // Configuration
+  // Cartel distribution settings
   private Dictionary<string, ConfigEntry<bool>>? _configSyncPathToggles;
   private SyncPathFileList _createdDirectories = [];
   private CancellationTokenSource _cts = new();
@@ -282,11 +282,11 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       out _createdDirectories
     );
 
-    Logger.LogInfo($"Found {UpdateCount} files to download.");
-    Logger.LogInfo($"- {_addedFiles.SelectMany(path => path.Value).Count()} added");
-    Logger.LogInfo($"- {_updatedFiles.SelectMany(path => path.Value).Count()} updated");
+    Logger.LogInfo($"📦 The cartel has {UpdateCount} packages ready for delivery, plata o plomo!");
+    Logger.LogInfo($"  ➕ {_addedFiles.SelectMany(path => path.Value).Count()} new shipments arriving");
+    Logger.LogInfo($"  🔄 {_updatedFiles.SelectMany(path => path.Value).Count()} packages repackaged");
     if (_removedFiles.Count > 0)
-      Logger.LogInfo($"- {_removedFiles.SelectMany(path => path.Value).Count()} removed");
+      Logger.LogInfo($"  ❌ {_removedFiles.SelectMany(path => path.Value).Count()} packages eliminated");
 
     if (UpdateCount > 0)
     {
@@ -352,7 +352,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       }
       catch (Exception e)
       {
-        Logger.LogError("Failed to create empty directories: " + e);
+        Logger.LogError("❌ Failed to establish safe house: " + e);
       }
 
     _downloadCount = 0;
@@ -365,7 +365,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
           [.. filesToAdd[syncPath.Path], .. filesToUpdate[syncPath.Path]]))
       .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-    Logger.LogInfo($"Starting download of {UpdateCount} files.");
+    Logger.LogInfo($"🚚 Beginning the smuggling operation for {UpdateCount} packages...");
     _downloadTasks = EnabledSyncPaths
       .SelectMany(syncPath =>
         filesToDownload.TryGetValue(syncPath.Path, out List<string>? pathFilesToDownload)
@@ -408,7 +408,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
     _downloadTasks.Clear();
     _progressWindow.Hide();
 
-    Logger.LogInfo("Download of files finished.");
+    Logger.LogInfo("✅ All packages delivered successfully, patron!");
 
     if (!_cts.IsCancellationRequested)
     {
@@ -457,7 +457,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
     if (IsHeadless)
       options.Add("--silent");
 
-    Logger.LogInfo($"Starting Updater with arguments {string.Join(" ", options)} {GetCurrentProcess().Id}");
+    Logger.LogInfo($"🔧 Sending the cleanup crew with orders: {string.Join(" ", options)} {GetCurrentProcess().Id}");
     ProcessStartInfo updaterStartInfo = new()
     {
       FileName = UpdaterPath,
@@ -477,20 +477,20 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
     _cts = new CancellationTokenSource();
     if (Directory.Exists(PendingUpdatesDir) || File.Exists(RemovedFilesPath))
       Logger.LogWarning(
-        "NarcoNet found previous update. Updater may have failed, check the 'NarcoNet_Data/Updater.log' for details. Attempting to continue."
+        "⚠️ Found evidence of a previous operation. The last courier may have been intercepted! Check 'NarcoNet_Data/Updater.log' for details. Continuing with caution..."
       );
 
-    Logger.LogDebug("Fetching server version");
+    Logger.LogDebug("📞 Calling the boss to verify the operation...");
     Task<string>? versionTask = _server?.GetNarcoNetVersion();
     yield return new WaitUntil(() => versionTask is { IsCompleted: true });
     try
     {
       string? version = versionTask?.Result;
 
-      Logger.LogInfo($"NarcoNet found server version: {version}");
+      Logger.LogInfo($"👔 The boss is running operation version: {version}");
       if (version != Info.Metadata.Version.ToString())
         Logger.LogWarning(
-          $"NarcoNet server version does not match plugin version. Found server version: {version}. Plugin may not work as expected!");
+          $"⚠️ Version mismatch detected! Boss is on {version}, but we're using different equipment. Things might get messy, compadre!");
     }
     catch (Exception e)
     {
@@ -501,7 +501,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       yield break;
     }
 
-    Logger.LogDebug("Fetching sync paths");
+    Logger.LogDebug("🗺️ Getting the smuggling routes from headquarters...");
     Task<List<SyncPath>>? syncPathTask = _server?.GetLocalSyncPaths();
     yield return new WaitUntil(() => syncPathTask is { IsCompleted: true });
     try
@@ -517,7 +517,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       yield break;
     }
 
-    Logger.LogDebug("Processing sync paths");
+    Logger.LogDebug("🛣️ Planning the delivery routes...");
     if (_syncPaths != null)
     {
       foreach (SyncPath syncPath in _syncPaths)
@@ -539,10 +539,10 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         }
       }
 
-      Logger.LogDebug("Running migrator");
+      Logger.LogDebug("📦 Checking old shipment records...");
       new Migrator(Directory.GetCurrentDirectory()).TryMigrate(Info.Metadata.Version, _syncPaths);
 
-      Logger.LogDebug("Loading syncPath configs");
+      Logger.LogDebug("⚙️ Loading cartel distribution settings...");
 
       try
       {
@@ -565,14 +565,14 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       catch (Exception e)
       {
         Logger.LogError(
-          $"Error binding sync path configs. This is likely a bug with NarcoNet. Please report it in the FIKA discord.\n{e}");
+          $"💥 The distribution system is broken! This is bad news, hermano. Report this to the FIKA cartel!\n{e}");
         Chainloader.DependencyErrors.Add(
           $"Could not load {Info.Metadata.Name} due to error binding sync path configs. Please check your server configuration and try again."
         );
       }
     }
 
-    Logger.LogDebug("Loading previous sync data");
+    Logger.LogDebug("📜 Reviewing the ledger from last time...");
     try
     {
       _previousSync = VFS.Exists(PreviousSyncPath)
@@ -588,7 +588,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       yield break;
     }
 
-    Logger.LogDebug("Loading local exclusions");
+    Logger.LogDebug("🚫 Loading the no-fly list...");
     if (IsHeadless && !VFS.Exists(LocalExclusionsPath))
       try
       {
@@ -618,7 +618,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
       yield break;
     }
 
-    Logger.LogDebug("Fetching exclusions");
+    Logger.LogDebug("🚫 Getting the blacklist from the boss...");
 
     List<string>? exclusions;
     Task<List<string>>? exclusionsTask = _server?.GetListExclusions();
@@ -638,7 +638,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
 
     yield return new WaitUntil(() => Singleton<CommonUI>.Instantiated);
 
-    Logger.LogDebug("Hashing local files");
+    Logger.LogDebug("🔍 Counting the inventory in our warehouse...");
     if (exclusions == null) yield break;
     {
       Task<SyncPathModFiles> localModFilesTask = Sync.HashLocalFiles(
@@ -653,7 +653,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
 
       VFS.WriteTextFile(LocalHashesPath, Json.Serialize(localModFiles));
 
-      Logger.LogDebug("Fetching remote file hashes");
+      Logger.LogDebug("📋 Getting the boss's inventory list...");
       Task<Dictionary<string, Dictionary<string, string>>>? remoteHashesTask =
         _server?.GetRemoteHashes(EnabledSyncPaths);
       yield return new WaitUntil(() => remoteHashesTask is { IsCompleted: true });
@@ -698,7 +698,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         );
       }
 
-      Logger.LogDebug("Comparing file hashes");
+      Logger.LogDebug("⚖️ Comparing our inventory with the boss's orders...");
       try
       {
         AnalyzeModFiles(localModFiles);

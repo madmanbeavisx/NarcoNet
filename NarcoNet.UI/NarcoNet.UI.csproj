@@ -220,4 +220,18 @@
         <ProjectReference Include="..\NarcoNet.Utilities\NarcoNet.Utilities.csproj"/>
     </ItemGroup>
 
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <PropertyGroup>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+        </PropertyGroup>
+
+        <!-- Create output directory structure -->
+        <MakeDir Directories="$(BuildOutputDir)" />
+
+        <!-- Copy the UI DLL -->
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+
+        <Message Text="NarcoNet.UI copied to: $(BuildOutputDir)" Importance="high" />
+    </Target>
+
 </Project>

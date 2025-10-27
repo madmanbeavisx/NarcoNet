@@ -21,4 +21,24 @@
         <ProjectReference Include="..\NarcoNet.Utilities\NarcoNet.Utilities.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <Reference Include="NarcoNet.Utilities">
+        <HintPath>..\NarcoNet.Utilities\bin\Release\NarcoNet.Utilities.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <PropertyGroup>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+        </PropertyGroup>
+
+        <!-- Create output directory structure -->
+        <MakeDir Directories="$(BuildOutputDir)" />
+
+        <!-- Copy the updater executable -->
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+
+        <Message Text="Updater copied to: $(BuildOutputDir)" Importance="high" />
+    </Target>
+
 </Project>
