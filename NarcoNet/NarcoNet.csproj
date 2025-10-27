@@ -1,9 +1,85 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
+        <PackageReference Include="SPTarkov.Common" Version="4.0.1"/>
+        <PackageReference Include="SPTarkov.DI" Version="4.0.1"/>
+        <PackageReference Include="SPTarkov.Reflection" Version="4.0.1"/>
+        <PackageReference Include="SPTarkov.Server.Core" Version="4.0.1"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NarcoNet.Utilities\NarcoNet.Utilities.csproj"/>
+        <ProjectReference Include="..\NarcoNet.UI\NarcoNet.UI.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="Assembly-CSharp">
+            <HintPath>..\References\Assembly-CSharp.dll</HintPath>
+        </Reference>
+        <Reference Include="BepInEx">
+            <HintPath>..\References\BepInEx.dll</HintPath>
+        </Reference>
+        <Reference Include="BepInEx.Harmony">
+            <HintPath>..\References\BepInEx.Harmony.dll</HintPath>
+        </Reference>
+        <Reference Include="bsg.console.core">
+            <HintPath>..\References\bsg.console.core.dll</HintPath>
+        </Reference>
+        <Reference Include="Comfort">
+            <HintPath>..\References\Comfort.dll</HintPath>
+        </Reference>
+        <Reference Include="Comfort.Unity">
+            <HintPath>..\References\Comfort.Unity.dll</HintPath>
+        </Reference>
+        <Reference Include="Sirenix.Serialization">
+            <HintPath>..\References\Sirenix.Serialization.dll</HintPath>
+        </Reference>
+        <Reference Include="spt-common">
+            <HintPath>..\References\spt-common.dll</HintPath>
+        </Reference>
+        <Reference Include="spt-core">
+            <HintPath>..\References\spt-core.dll</HintPath>
+        </Reference>
+        <Reference Include="spt-custom">
+            <HintPath>..\References\spt-custom.dll</HintPath>
+        </Reference>
+        <Reference Include="spt-reflection">
+            <HintPath>..\References\spt-reflection.dll</HintPath>
+        </Reference>
+        <Reference Include="Unity.TextMeshPro">
+            <HintPath>..\References\Unity.TextMeshPro.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine">
+            <HintPath>..\References\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>..\References\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.ClothModule">
+            <HintPath>..\References\UnityEngine.ClothModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>..\References\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>..\References\UnityEngine.IMGUIModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>..\References\UnityEngine.InputLegacyModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath>..\References\UnityEngine.TextRenderingModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath>..\References\UnityEngine.UI.dll</HintPath>
+        </Reference>
+    </ItemGroup>
 
 </Project>
