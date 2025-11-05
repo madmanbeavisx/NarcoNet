@@ -1,4 +1,3 @@
-using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using NarcoNet.Utilities;
@@ -12,15 +11,15 @@ public class ClientConfigService : IClientConfigService
 {
     private static readonly List<string> HeadlessDefaultExclusions =
     [
-        "BepInEx/plugins/AmandsGraphics.dll",
-        "BepInEx/plugins/AmandsSense.dll",
-        "BepInEx/plugins/Sense",
-        "BepInEx/plugins/MoreCheckmarks",
-        "BepInEx/plugins/kmyuhkyuk-EFTApi",
-        "BepInEx/plugins/DynamicMaps",
-        "BepInEx/plugins/LootValue",
-        "BepInEx/plugins/CactusPie.RamCleanerInterval.dll",
-        "BepInEx/plugins/TYR_DeClutterer.dll"
+        "../BepInEx/plugins/AmandsGraphics.dll",
+        "../BepInEx/plugins/AmandsSense.dll",
+        "../BepInEx/plugins/Sense",
+        "../BepInEx/plugins/MoreCheckmarks",
+        "../BepInEx/plugins/kmyuhkyuk-EFTApi",
+        "../BepInEx/plugins/DynamicMaps",
+        "../BepInEx/plugins/LootValue",
+        "../BepInEx/plugins/CactusPie.RamCleanerInterval.dll",
+        "../BepInEx/plugins/TYR_DeClutterer.dll"
     ];
 
     private ConfigEntry<bool>? _deleteRemovedFiles;

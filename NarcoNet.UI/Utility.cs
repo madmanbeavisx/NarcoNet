@@ -26,7 +26,7 @@ public static class Utility
     public static Texture2D GetGradientTexture(Color colorStart, Color colorEnd, int width = 1, int height = 256,
         bool horizontal = false)
     {
-        string key = $"{colorStart}_{colorEnd}_{width}_{height}_{horizontal}";
+        var key = $"{colorStart}_{colorEnd}_{width}_{height}_{horizontal}";
         if (GradientTextures.TryGetValue(key, out Texture2D? cachedTexture))
         {
             return cachedTexture;
@@ -34,9 +34,9 @@ public static class Utility
 
         Texture2D texture = new(width, height);
 
-        for (int y = 0; y < height; y++)
+        for (var y = 0; y < height; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (var x = 0; x < width; x++)
             {
                 float t = horizontal ? (float)x / width : (float)y / height;
                 Color color = Color.Lerp(colorStart, colorEnd, t);
@@ -52,7 +52,7 @@ public static class Utility
     public static Texture2D GetRoundedTexture(int width, int height, int radius, Color color, Color? borderColor = null,
         int borderWidth = 0)
     {
-        string key = $"{width}_{height}_{radius}_{color}_{borderColor}_{borderWidth}";
+        var key = $"{width}_{height}_{radius}_{color}_{borderColor}_{borderWidth}";
         if (RoundedTextures.TryGetValue(key, out Texture2D? cachedTexture))
         {
             return cachedTexture;
@@ -61,9 +61,9 @@ public static class Utility
         Texture2D texture = new(width, height);
         Color transparent = new(0, 0, 0, 0);
 
-        for (int y = 0; y < height; y++)
+        for (var y = 0; y < height; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (var x = 0; x < width; x++)
             {
                 float distanceFromEdge = GetDistanceFromRoundedRectEdge(x, y, width, height, radius);
 
@@ -89,10 +89,6 @@ public static class Utility
 
     private static float GetDistanceFromRoundedRectEdge(int x, int y, int width, int height, int radius)
     {
-        // Calculate distance from the edge of a rounded rectangle
-        int cx = x < radius ? radius : x > width - radius ? width - radius : x;
-        int cy = y < radius ? radius : y > height - radius ? height - radius : y;
-
         if (x < radius && y < radius)
         {
             // Top-left corner

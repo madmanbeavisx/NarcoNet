@@ -87,8 +87,8 @@ public sealed class FileLogger : ILogger
     /// <param name="message">The message to log.</param>
     private void WriteLog(string level, string message)
     {
-        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        string formattedMessage = $"[{timestamp}] [{level}] {NarcoNetConstants.UpdaterLogPrefix}: {message}";
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        var formattedMessage = $"[{timestamp}] [{level}] {NarcoNetConstants.UpdaterLogPrefix}: {message}";
 
         // Write to console
         Console.WriteLine(formattedMessage);

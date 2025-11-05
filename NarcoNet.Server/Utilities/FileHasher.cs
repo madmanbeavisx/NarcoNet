@@ -22,13 +22,8 @@ public static class FileHasher
 
         await using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
 
-        if (size < SampleThreshold || size < 4 * SampleSize)
-        {
-            // Hash the entire file
-            dataToHash = new byte[size];
-            await fileStream.ReadExactlyAsync(dataToHash, cancellationToken);
-        }
-        else
+        // Only use sampling for files >= 10MB that are large enough to sample
+        if (size is >= SampleThreshold and >= 3 * SampleSize)
         {
             // Sample from start, middle, and end
             dataToHash = new byte[SampleSize * 3];
@@ -45,12 +40,18 @@ public static class FileHasher
             fileStream.Seek(size - SampleSize, SeekOrigin.Begin);
             await fileStream.ReadExactlyAsync(dataToHash.AsMemory(SampleSize * 2, SampleSize), cancellationToken);
         }
+        else
+        {
+            // Hash the entire file
+            dataToHash = new byte[size];
+            await fileStream.ReadExactlyAsync(dataToHash, cancellationToken);
+        }
 
         // Hash the data
         byte[] hash = MD5.HashData(dataToHash);
 
         // Append file size to hash (varint encoding)
-        byte[] result = new byte[hash.Length + 10]; // Max varint size is 10 bytes
+        var result = new byte[hash.Length + 10]; // Max varint size is 10 bytes
         Array.Copy(hash, result, hash.Length);
         int varintLength = EncodeVarint(result.AsSpan(hash.Length), (ulong)size);
 
@@ -62,7 +63,7 @@ public static class FileHasher
     /// </summary>
     private static int EncodeVarint(Span<byte> buffer, ulong value)
     {
-        int i = 0;
+        var i = 0;
         while (value >= 0x80)
         {
             buffer[i] = (byte)(value & 0xFF | 0x80);

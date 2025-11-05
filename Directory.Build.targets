@@ -4,7 +4,7 @@
         <Message Importance="high" Text="Deploying Build folder to test locations..." />
 
         <!-- Copy BepInEx folder contents -->
-        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\BepInEx\*&quot; &quot;C:\SPT\SPT\BepInEx\&quot; /S /Y /I /Q"
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\BepInEx\*&quot; &quot;C:\SPT\BepInEx\&quot; /S /Y /I /Q"
               ContinueOnError="true"
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\BepInEx')" />
@@ -14,7 +14,7 @@
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\BepInEx')" />
 
-        <!-- Copy SPT root files (updater and DLLs) -->
+        <!-- Copy SPT root files (updater and DLLs) to server -->
         <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.exe&quot; &quot;C:\SPT\SPT\&quot; /Y /Q"
               ContinueOnError="true"
               IgnoreExitCode="true"
@@ -25,12 +25,13 @@
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
 
-        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.exe&quot; &quot;C:\SPT - Copy\&quot; /Y /Q"
+        <!-- Copy SPT root files (updater and DLLs) to client SPT folder -->
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.exe&quot; &quot;C:\SPT - Copy\SPT\&quot; /Y /Q"
               ContinueOnError="true"
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
 
-        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.dll&quot; &quot;C:\SPT - Copy\&quot; /Y /Q"
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.dll&quot; &quot;C:\SPT - Copy\SPT\&quot; /Y /Q"
               ContinueOnError="true"
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
@@ -41,7 +42,7 @@
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT\user')" />
 
-        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\user\*&quot; &quot;C:\SPT - Copy\user\&quot; /S /Y /I /Q"
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\user\*&quot; &quot;C:\SPT - Copy\SPT\user\&quot; /S /Y /I /Q"
               ContinueOnError="true"
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT\user')" />

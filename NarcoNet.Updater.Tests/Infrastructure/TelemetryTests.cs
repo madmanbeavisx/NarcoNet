@@ -181,7 +181,7 @@ public class TelemetryTests
         telemetry.Clear();
 
         // Act - Record many operations with varying durations
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < 100; i++)
         {
             using (telemetry.BeginOperation("perf_test"))
             {
@@ -263,7 +263,7 @@ public class TelemetryTests
 
         // Act
         TelemetrySummary summary = telemetry.GetSummary();
-        string text = summary.ToString();
+        var text = summary.ToString();
 
         // Assert
         text.Should().Contain("Telemetry Summary");
@@ -280,7 +280,7 @@ public class TelemetryTests
         telemetry.Clear();
 
         // Act - Record values from 1 to 100
-        for (int i = 1; i <= 100; i++)
+        for (var i = 1; i <= 100; i++)
         {
             telemetry.RecordMetric("percentile_test", i);
         }
@@ -325,7 +325,7 @@ public class TelemetryTests
         ];
 
         // Act - Record from multiple threads
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             tasks.Add(Task.Run(() =>
             {

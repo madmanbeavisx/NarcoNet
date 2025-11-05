@@ -50,7 +50,7 @@ public class SyncService
         foreach (FileInfo file in dirInfo.GetFiles())
         {
             string filePath = file.FullName;
-            if (IsExcluded(filePath, config.Exclusions))
+            if (IsExcluded(filePath, config.Exclusions, baseDir))
             {
                 continue;
             }
@@ -62,7 +62,7 @@ public class SyncService
         foreach (DirectoryInfo subDir in dirInfo.GetDirectories())
         {
             string subDirPath = subDir.FullName;
-            if (IsExcluded(subDirPath, config.Exclusions))
+            if (IsExcluded(subDirPath, config.Exclusions, baseDir))
             {
                 continue;
             }
@@ -90,9 +90,20 @@ public class SyncService
     /// <summary>
     ///     Check if a path is excluded based on exclusion patterns
     /// </summary>
-    private bool IsExcluded(string path, List<string> exclusions)
+    private bool IsExcluded(string path, List<string> exclusions, string? baseDir = null)
     {
-        string unixPath = PathHelper.ToUnixPath(path);
+        // Convert absolute path to relative path from server root for pattern matching
+        string relativePath;
+        if (baseDir != null && Path.IsPathFullyQualified(path))
+        {
+            relativePath = Path.GetRelativePath(baseDir, path);
+        }
+        else
+        {
+            relativePath = path;
+        }
+
+        string unixPath = PathHelper.ToUnixPath(relativePath);
         return exclusions.Any(pattern => GlobMatcher.Matches(unixPath, pattern));
     }
 
@@ -107,7 +118,7 @@ public class SyncService
             return new ModFile("", true);
         }
 
-        int retryCount = 0;
+        var retryCount = 0;
         while (true)
         {
             try
@@ -116,7 +127,7 @@ public class SyncService
                 try
                 {
                     string hash = await FileHasher.HashFileAsync(file, cancellationToken);
-                    return new ModFile(hash, false);
+                    return new ModFile(hash);
                 }
                 finally
                 {
@@ -154,7 +165,7 @@ public class SyncService
         foreach (SyncPath syncPath in syncPaths)
         {
             string fullPath = Path.GetFullPath(syncPath.Path);
-            List<string> files = await GetFilesInDirectoryAsync(fullPath, fullPath, config);
+            List<string> files = await GetFilesInDirectoryAsync(baseDir, fullPath, config);
             ConcurrentDictionary<string, ModFile> filesResult = new();
 
             // Process files in parallel
@@ -170,9 +181,8 @@ public class SyncService
                 }
             });
 
-            // Use relative sync path as dictionary key
-            string relativeSyncPath = Path.GetRelativePath(baseDir, fullPath);
-            result[PathHelper.ToWindowsPath(relativeSyncPath)] = new Dictionary<string, ModFile>(filesResult);
+            // Use the original syncPath.Path as dictionary key to match client expectations
+            result[PathHelper.ToWindowsPath(syncPath.Path)] = new Dictionary<string, ModFile>(filesResult);
         }
 
         double elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
@@ -186,18 +196,22 @@ public class SyncService
     /// </summary>
     public string SanitizeDownloadPath(string file, List<SyncPath> syncPaths)
     {
-        string normalized = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), file));
+        string baseDir = Directory.GetCurrentDirectory();
+        string normalized = Path.GetFullPath(Path.Combine(baseDir, file));
 
         foreach (SyncPath syncPath in syncPaths)
         {
-            string fullPath = Path.GetFullPath(syncPath.Path);
+            string fullPath = Path.GetFullPath(Path.Combine(baseDir, syncPath.Path));
+
+            // Check if the normalized file path is within the sync path
+            // GetRelativePath returns a path without ".." if the file is within the base
             string relativePath = Path.GetRelativePath(fullPath, normalized);
-            if (!relativePath.StartsWith(".."))
+            if (!relativePath.StartsWith("..") && !Path.IsPathRooted(relativePath))
             {
                 return normalized;
             }
         }
 
-        throw new UnauthorizedAccessException($"NarcoNet: Requested file '{file}' is not in an enabled sync path!");
+        throw new UnauthorizedAccessException("Path must match one of the configured sync paths");
     }
 }

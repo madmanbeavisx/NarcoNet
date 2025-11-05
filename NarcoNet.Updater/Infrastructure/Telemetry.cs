@@ -109,24 +109,15 @@ public sealed class TelemetryCollector
     /// <summary>
     ///     Represents a scope for an operation timing.
     /// </summary>
-    private class OperationScope : IDisposable
+    private class OperationScope(TelemetryCollector collector, string operationName) : IDisposable
     {
-        private readonly TelemetryCollector _collector;
-        private readonly string _operationName;
-        private readonly Stopwatch _stopwatch;
+        private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
         private bool _success = true;
-
-        public OperationScope(TelemetryCollector collector, string operationName)
-        {
-            _collector = collector;
-            _operationName = operationName;
-            _stopwatch = Stopwatch.StartNew();
-        }
 
         public void Dispose()
         {
             _stopwatch.Stop();
-            _collector.RecordOperationDuration(_operationName, _stopwatch.Elapsed, _success);
+            collector.RecordOperationDuration(operationName, _stopwatch.Elapsed, _success);
         }
 
         public void MarkAsFailure()
@@ -139,7 +130,7 @@ public sealed class TelemetryCollector
 /// <summary>
 ///     Stores metric data with statistical aggregations.
 /// </summary>
-internal class MetricData
+internal class MetricData(string name)
 {
     private readonly List<Dictionary<string, string>> _tags =
     [
@@ -149,12 +140,7 @@ internal class MetricData
     ];
     private int _count;
 
-    public MetricData(string name)
-    {
-        Name = name;
-    }
-
-    public string Name { get; }
+    public string Name { get; } = name;
 
     public void AddValue(double value, Dictionary<string, string>? tags = null)
     {
@@ -211,7 +197,7 @@ public class TelemetrySummary
 
     public override string ToString()
     {
-        string summary = $"=== Telemetry Summary (Uptime: {ApplicationUptime:hh\\:mm\\:ss}) ===\n";
+        var summary = $"=== Telemetry Summary (Uptime: {ApplicationUptime:hh\\:mm\\:ss}) ===\n";
         summary += $"Timestamp: {Timestamp:yyyy-MM-dd HH:mm:ss} UTC\n\n";
 
         foreach (MetricSummary metric in Metrics.OrderBy(m => m.Name))

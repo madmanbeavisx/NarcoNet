@@ -9,8 +9,8 @@ public class ApplicationConfigurationTests
     public void Constructor_WithValidParameters_CreatesConfiguration()
     {
         // Arrange
-        int processId = 1234;
-        bool isSilent = true;
+        var processId = 1234;
+        var isSilent = true;
 
         // Act
         ApplicationConfiguration config = new(processId, isSilent);
@@ -154,7 +154,7 @@ public class ApplicationConfigurationTests
         ApplicationConfiguration config = new(1234, true);
 
         // Act
-        string result = config.ToString();
+        var result = config.ToString();
 
         // Assert
         result.Should().Contain("1234");

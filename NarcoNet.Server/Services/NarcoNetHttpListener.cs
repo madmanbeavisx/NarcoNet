@@ -19,7 +19,11 @@ namespace NarcoNet.Server.Services;
 ///     HTTP listener for NarcoNet mod synchronization endpoints
 /// </summary>
 [Injectable(InjectionType = InjectionType.Singleton, TypePriority = OnLoadOrder.PreSptModLoader+1)]
-public class NarcoNetHttpListener : IHttpListener
+public class NarcoNetHttpListener(
+    ILogger<NarcoNetHttpListener> logger,
+    SyncService syncService,
+    MimeTypeHelper mimeTypeHelper)
+    : IHttpListener
 {
     // Fallback data for older client versions
     private static readonly Dictionary<string, object> FallbackSyncPaths = new()
@@ -76,22 +80,9 @@ public class NarcoNetHttpListener : IHttpListener
         }
     };
 
-    private readonly ILogger<NarcoNetHttpListener> _logger;
-    private readonly MimeTypeHelper _mimeTypeHelper;
-    private readonly SyncService _syncService;
     private NarcoNetConfig? _config;
     private bool _isInitialized;
     private string? _modVersion;
-
-    public NarcoNetHttpListener(
-        ILogger<NarcoNetHttpListener> logger,
-        SyncService syncService,
-        MimeTypeHelper mimeTypeHelper)
-    {
-        _logger = logger;
-        _syncService = syncService;
-        _mimeTypeHelper = mimeTypeHelper;
-    }
 
     public bool CanHandle(MongoId sessionId, HttpContext context)
     {
@@ -102,8 +93,8 @@ public class NarcoNetHttpListener : IHttpListener
     {
         if (!_isInitialized || _config == null)
         {
-            string errorMsg = $"NarcoNet: Not initialized (_isInitialized={_isInitialized}, _config={(_config == null ? "null" : "not null")})";
-            _logger.LogWarning(errorMsg);
+            var errorMsg = $"NarcoNet: Not initialized (_isInitialized={_isInitialized}, _config={(_config == null ? "null" : "not null")})";
+            logger.LogWarning(errorMsg);
             context.Response.StatusCode = 500;
 
             byte[] errorBytes = System.Text.Encoding.UTF8.GetBytes(errorMsg);
@@ -146,7 +137,7 @@ public class NarcoNetHttpListener : IHttpListener
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling request [{Method} {Path}]", context.Request.Method, context.Request.Path);
+            logger.LogError(ex, "Error handling request [{Method} {Path}]", context.Request.Method, context.Request.Path);
             context.Response.StatusCode = 500;
             await context.Response.WriteAsync($"NarcoNet: Error handling [{context.Request.Method} {context.Request.Path}]:\n{ex}");
         }
@@ -154,11 +145,11 @@ public class NarcoNetHttpListener : IHttpListener
 
     public void Initialize(NarcoNetConfig config, string modVersion)
     {
-        _logger.LogDebug("HttpListener.Initialize() called with version {Version}", modVersion);
+        logger.LogDebug("HttpListener.Initialize() called with version {Version}", modVersion);
         _config = config;
         _modVersion = modVersion;
         _isInitialized = true;
-        _logger.LogDebug("HttpListener initialized successfully (_isInitialized={IsInit})", _isInitialized);
+        logger.LogDebug("HttpListener initialized successfully (_isInitialized={IsInit})", _isInitialized);
     }
 
     private async Task HandleGetVersion(HttpContext context)
@@ -228,17 +219,51 @@ public class NarcoNetHttpListener : IHttpListener
         else
         {
             StringValues pathsParam = context.Request.Query["path"];
-            List<SyncPath> pathsToHash = _config!.SyncPaths;
 
-            if (pathsParam.Count > 0)
+            Console.WriteLine($"[NarcoNet HttpListener] Hash request received, pathsParam.Count={pathsParam.Count}");
+            Console.WriteLine($"[NarcoNet HttpListener] Total sync paths in config: {_config!.SyncPaths.Count}");
+            foreach (var sp in _config.SyncPaths)
             {
-                List<string?> requestedPaths = pathsParam.ToList();
-                pathsToHash = _config.SyncPaths
-                    .Where(sp => sp.Enforced || requestedPaths.Contains(sp.Path))
-                    .ToList();
+                Console.WriteLine($"  - {sp.Path} (Enabled={sp.Enabled}, Enforced={sp.Enforced})");
             }
 
-            Dictionary<string, Dictionary<string, ModFile>> hashResults = await _syncService.HashModFilesAsync(pathsToHash, _config, context.RequestAborted);
+            // Only hash enabled or enforced sync paths
+            List<SyncPath> pathsToHash;
+            if (pathsParam.Count > 0)
+            {
+                // Client requested specific paths - only hash those (if enabled or enforced)
+                List<string?> requestedPaths = pathsParam.ToList();
+                Console.WriteLine($"[NarcoNet HttpListener] Client requested {requestedPaths.Count} specific paths:");
+                foreach (var rp in requestedPaths)
+                {
+                    Console.WriteLine($"  - '{rp}'");
+                }
+                logger.LogDebug("Client requested specific paths: {Paths}", string.Join(", ", requestedPaths));
+                pathsToHash = _config!.SyncPaths
+                    .Where(sp => (sp.Enabled || sp.Enforced) && requestedPaths.Contains(sp.Path))
+                    .ToList();
+                Console.WriteLine($"[NarcoNet HttpListener] After filtering: {pathsToHash.Count} paths will be hashed");
+                foreach (var sp in pathsToHash)
+                {
+                    Console.WriteLine($"  - {sp.Path}");
+                }
+                logger.LogDebug("Filtered to {Count} enabled/enforced paths: {Paths}",
+                    pathsToHash.Count, string.Join(", ", pathsToHash.Select(p => p.Path)));
+            }
+            else
+            {
+                // No specific paths requested - hash all enabled/enforced paths
+                Console.WriteLine($"[NarcoNet HttpListener] No specific paths requested, hashing all enabled/enforced");
+                logger.LogDebug("No specific paths requested, hashing all enabled/enforced paths");
+                pathsToHash = _config!.SyncPaths
+                    .Where(sp => sp.Enabled || sp.Enforced)
+                    .ToList();
+                Console.WriteLine($"[NarcoNet HttpListener] Will hash {pathsToHash.Count} paths");
+                logger.LogDebug("Found {Count} enabled/enforced paths: {Paths}",
+                    pathsToHash.Count, string.Join(", ", pathsToHash.Select(p => p.Path)));
+            }
+
+            Dictionary<string, Dictionary<string, ModFile>> hashResults = await syncService.HashModFilesAsync(pathsToHash, _config, context.RequestAborted);
 
             // Convert ModFile objects to just hash strings for client
             Dictionary<string, Dictionary<string, string>> hashes = hashResults.ToDictionary(
@@ -248,6 +273,13 @@ public class NarcoNetHttpListener : IHttpListener
                     fileKvp => fileKvp.Value.Hash
                 )
             );
+
+            // Log total file counts per path
+            foreach (var pathHash in hashes)
+            {
+                logger.LogDebug("Path '{Path}' has {Count} files",
+                    pathHash.Key, pathHash.Value.Count);
+            }
 
             json = JsonSerializer.Serialize(hashes);
         }
@@ -268,7 +300,7 @@ public class NarcoNetHttpListener : IHttpListener
 
         try
         {
-            string sanitizedPath = _syncService.SanitizeDownloadPath(filePath, _config!.SyncPaths);
+            string sanitizedPath = syncService.SanitizeDownloadPath(filePath, _config!.SyncPaths);
 
             if (!File.Exists(sanitizedPath))
             {
@@ -279,10 +311,10 @@ public class NarcoNetHttpListener : IHttpListener
 
             FileInfo fileInfo = new(sanitizedPath);
             string extension = Path.GetExtension(filePath);
-            string mimeType = _mimeTypeHelper.GetMimeType(extension) ?? "application/octet-stream";
+            string mimeType = mimeTypeHelper.GetMimeType(extension) ?? "application/octet-stream";
 
             // Log the download
-            _logger.LogInformation("Serving file '{FilePath}' ({FileSize} bytes) to {ClientIp}",
+            logger.LogInformation("Serving file '{FilePath}' ({FileSize} bytes) to {ClientIp}",
                 filePath, fileInfo.Length, clientIp);
 
             context.Response.Headers["Accept-Ranges"] = "bytes";
@@ -300,7 +332,7 @@ public class NarcoNetHttpListener : IHttpListener
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reading file '{FilePath}'", filePath);
+            logger.LogError(ex, "Error reading file '{FilePath}'", filePath);
             context.Response.StatusCode = 500;
             await context.Response.WriteAsync($"NarcoNet: Error reading '{filePath}'\n{ex}");
         }

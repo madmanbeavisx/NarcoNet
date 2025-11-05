@@ -39,7 +39,7 @@ public class ProcessMonitorServiceTests
         // Arrange
         TestLogger logger = new();
         ProcessMonitorService service = new(logger);
-        int nonExistentProcessId = 999999;
+        var nonExistentProcessId = 999999;
 
         // Act
         bool isRunning = service.IsProcessRunning(nonExistentProcessId);
@@ -69,7 +69,7 @@ public class ProcessMonitorServiceTests
         // Arrange
         TestLogger logger = new();
         ProcessMonitorService service = new(logger);
-        int nonExistentProcessId = 999999;
+        var nonExistentProcessId = 999999;
 
         // Act
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -109,7 +109,7 @@ public class ProcessMonitorServiceTests
         ProcessMonitorService service = new(logger);
         int currentProcessId = Process.GetCurrentProcess().Id;
         CancellationTokenSource cts = new();
-        int callbackInvocations = 0;
+        var callbackInvocations = 0;
 
         void ProgressCallback(int iteration)
         {
@@ -185,6 +185,6 @@ public class ProcessMonitorServiceTests
 
         // Assert
         logger.ContainsMessage("Waiting for process").Should().BeTrue();
-        logger.ContainsMessage("is still running").Should().BeTrue();
+        logger.ContainsMessage("still running").Should().BeTrue();
     }
 }

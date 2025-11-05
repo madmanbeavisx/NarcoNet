@@ -72,7 +72,7 @@ public class HealthCheck
     /// <summary>
     ///     Checks if the environment is ready for update operations.
     /// </summary>
-    public static async Task<HealthCheckResult> CheckEnvironmentAsync(CancellationToken cancellationToken = default)
+    public static Task<HealthCheckResult> CheckEnvironmentAsync(CancellationToken cancellationToken = default)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
         Dictionary<string, object> data = new();
@@ -90,11 +90,11 @@ public class HealthCheck
 
             if (!tarkovExists)
             {
-                return HealthCheckResult.Unhealthy(
+                return Task.FromResult(HealthCheckResult.Unhealthy(
                     "EscapeFromTarkov.exe not found in current directory",
                     data: data,
                     duration: stopwatch.Elapsed
-                );
+                ));
             }
 
             // Check if NarcoNet_Data directory exists
@@ -104,11 +104,11 @@ public class HealthCheck
 
             if (!dataDirectoryExists)
             {
-                return HealthCheckResult.Unhealthy(
+                return Task.FromResult(HealthCheckResult.Unhealthy(
                     "NarcoNet_Data directory not found",
                     data: data,
                     duration: stopwatch.Elapsed
-                );
+                ));
             }
 
             // Check disk space
@@ -118,11 +118,11 @@ public class HealthCheck
 
             if (availableSpaceGB < 1.0) // Less than 1GB
             {
-                return HealthCheckResult.Degraded(
+                return Task.FromResult(HealthCheckResult.Degraded(
                     $"Low disk space: {availableSpaceGB:F2} GB available",
                     data,
                     stopwatch.Elapsed
-                );
+                ));
             }
 
             // Check write permissions
@@ -136,34 +136,34 @@ public class HealthCheck
             catch
             {
                 data["WritePermissions"] = false;
-                return HealthCheckResult.Unhealthy(
+                return Task.FromResult(HealthCheckResult.Unhealthy(
                     "No write permissions in current directory",
                     data: data,
                     duration: stopwatch.Elapsed
-                );
+                ));
             }
 
-            return HealthCheckResult.Healthy(
+            return Task.FromResult(HealthCheckResult.Healthy(
                 "Environment is healthy and ready for updates",
                 data,
                 stopwatch.Elapsed
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(
+            return Task.FromResult(HealthCheckResult.Unhealthy(
                 "Health check failed with exception",
                 ex,
                 data,
                 stopwatch.Elapsed
-            );
+            ));
         }
     }
 
     /// <summary>
     ///     Checks if pending updates are valid and can be applied.
     /// </summary>
-    public static async Task<HealthCheckResult> CheckPendingUpdatesAsync(string updateDirectory,
+    public static Task<HealthCheckResult> CheckPendingUpdatesAsync(string updateDirectory,
         CancellationToken cancellationToken = default)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -175,11 +175,11 @@ public class HealthCheck
 
             if (!Directory.Exists(updateDirectory))
             {
-                return HealthCheckResult.Healthy(
+                return Task.FromResult(HealthCheckResult.Healthy(
                     "No pending updates",
                     data,
                     stopwatch.Elapsed
-                );
+                ));
             }
 
             string[] updateFiles = Directory.GetFiles(updateDirectory, "*", SearchOption.AllDirectories);
@@ -187,11 +187,11 @@ public class HealthCheck
 
             if (updateFiles.Length == 0)
             {
-                return HealthCheckResult.Healthy(
+                return Task.FromResult(HealthCheckResult.Healthy(
                     "No pending updates",
                     data,
                     stopwatch.Elapsed
-                );
+                ));
             }
 
             // Calculate total size
@@ -208,27 +208,27 @@ public class HealthCheck
             if (suspiciousFiles.Any())
             {
                 data["SuspiciousFiles"] = suspiciousFiles.Select(Path.GetFileName).ToList();
-                return HealthCheckResult.Degraded(
+                return Task.FromResult(HealthCheckResult.Degraded(
                     $"Found {suspiciousFiles.Count} potentially executable files in update",
                     data,
                     stopwatch.Elapsed
-                );
+                ));
             }
 
-            return HealthCheckResult.Healthy(
+            return Task.FromResult(HealthCheckResult.Healthy(
                 $"{updateFiles.Length} files ready for update ({totalSizeMB:F2} MB)",
                 data,
                 stopwatch.Elapsed
-            );
+            ));
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(
+            return Task.FromResult(HealthCheckResult.Unhealthy(
                 "Failed to check pending updates",
                 ex,
                 data,
                 stopwatch.Elapsed
-            );
+            ));
         }
     }
 

@@ -151,8 +151,8 @@ internal class UpdateBox(string title, string message, string continueText, stri
         GUI.EndScrollView();
 
         // Add padding between buttons
-        float buttonPadding = 12f;
-        float buttonMargin = 16f;
+        var buttonPadding = 12f;
+        var buttonMargin = 16f;
 
         if (onDecline != null &&
             _declineButton.Draw(new Rect(

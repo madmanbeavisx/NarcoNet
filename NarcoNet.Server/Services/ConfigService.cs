@@ -189,6 +189,12 @@ public class ConfigService
 
         (List<SyncPath> rawSyncPaths, List<string> exclusions) = await LoadConfigFileAsync(configPath);
 
+        Console.WriteLine($"[NarcoNet ConfigService] Loaded {rawSyncPaths.Count} sync paths from config:");
+        foreach (var sp in rawSyncPaths)
+        {
+            Console.WriteLine($"  - Path: {sp.Path}, Enabled: {sp.Enabled}, Enforced: {sp.Enforced}");
+        }
+
         ValidateConfig(rawSyncPaths, exclusions, configPath);
 
         // Build the final config with built-in sync paths
@@ -212,10 +218,20 @@ public class ConfigService
             )
         };
 
-        syncPaths.AddRange(rawSyncPaths);
+        // Only add enabled or enforced sync paths
+        var filteredPaths = rawSyncPaths.Where(sp => sp.Enabled || sp.Enforced).ToList();
+        Console.WriteLine($"[NarcoNet ConfigService] After filtering, {filteredPaths.Count} paths are enabled/enforced:");
+        foreach (var sp in filteredPaths)
+        {
+            Console.WriteLine($"  - Path: {sp.Path}, Enabled: {sp.Enabled}, Enforced: {sp.Enforced}");
+        }
+
+        syncPaths.AddRange(filteredPaths);
 
         // Sort by path length descending
         syncPaths = syncPaths.OrderByDescending(sp => sp.Path.Length).ToList();
+
+        Console.WriteLine($"[NarcoNet ConfigService] Final config has {syncPaths.Count} total sync paths (including builtins)");
 
         return new NarcoNetConfig
         {
@@ -297,13 +313,57 @@ public class ConfigService
                         ? p.ToString()
                         : throw new InvalidOperationException("Missing 'path' in syncPath object");
 
+                    var enabledValue = true;
+                    if (dict.TryGetValue("enabled", out object? e))
+                    {
+                        enabledValue = e switch
+                        {
+                            bool b => b,
+                            string s => bool.Parse(s),
+                            _ => true
+                        };
+                    }
+
+                    var enforcedValue = false;
+                    if (dict.TryGetValue("enforced", out object? enf))
+                    {
+                        enforcedValue = enf switch
+                        {
+                            bool b => b,
+                            string s => bool.Parse(s),
+                            _ => false
+                        };
+                    }
+
+                    var silentValue = false;
+                    if (dict.TryGetValue("silent", out object? sil))
+                    {
+                        silentValue = sil switch
+                        {
+                            bool b => b,
+                            string s => bool.Parse(s),
+                            _ => false
+                        };
+                    }
+
+                    var restartValue = true;
+                    if (dict.TryGetValue("restartRequired", out object? r))
+                    {
+                        restartValue = r switch
+                        {
+                            bool b => b,
+                            string s => bool.Parse(s),
+                            _ => true
+                        };
+                    }
+
                     syncPaths.Add(new SyncPath(
                         Path: path!,
                         Name: dict.TryGetValue("name", out object? n) ? n.ToString() ?? path! : path!,
-                        Enabled: !dict.TryGetValue("enabled", out object? e) || e is not bool enabled || enabled,
-                        Enforced: dict.TryGetValue("enforced", out object? enf) && enf is bool and true,
-                        Silent: dict.TryGetValue("silent", out object? s) && s is bool and true,
-                        RestartRequired: !dict.TryGetValue("restartRequired", out object? r) || r is not bool restart || restart
+                        Enabled: enabledValue,
+                        Enforced: enforcedValue,
+                        Silent: silentValue,
+                        RestartRequired: restartValue
                     ));
                 }
             }

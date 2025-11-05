@@ -1,25 +1,28 @@
 using System.Collections;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
+
 using BepInEx;
 using BepInEx.Bootstrap;
-using BepInEx.Configuration;
 using BepInEx.Logging;
 using Comfort.Common;
 using EFT.UI;
-using NarcoNet.UI;
+using NarcoNet.Services;
 using NarcoNet.Utilities;
 using SPT.Common.Utils;
 using UnityEngine;
 using static System.Diagnostics.Process;
-using Debug = System.Diagnostics.Debug;
+
 namespace NarcoNet;
 using SyncPathFileList = Dictionary<string, List<string>>;
 using SyncPathModFiles = Dictionary<string, Dictionary<string, ModFile>>;
 
+/// <summary>
+///     Main NarcoNet client plugin that coordinates file synchronization between SPT server and client
+/// </summary>
 [BepInPlugin("com.madmanbeavis.narconet.client", "MadManBeavis's NarcoNet", NarcoNetVersion.Version)]
 public class NarcoPlugin : BaseUnityPlugin, IDisposable
 {
+    // Static paths
     private static readonly string NarcoNetDir = Path.Combine(Directory.GetCurrentDirectory(), "NarcoNet_Data");
     private static readonly string PendingUpdatesDir = Path.Combine(NarcoNetDir, "PendingUpdates");
     private static readonly string PreviousSyncPath = Path.Combine(NarcoNetDir, "PreviousSync.json");
@@ -28,113 +31,72 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
     private static readonly string LocalExclusionsPath = Path.Combine(NarcoNetDir, "Exclusions.json");
     private static readonly string UpdaterPath = Path.Combine(Directory.GetCurrentDirectory(), "NarcoNet.Updater.exe");
 
-    private static readonly List<string> HeadlessDefaultExclusions =
-    [
-        "BepInEx/plugins/AmandsGraphics.dll",
-        "BepInEx/plugins/AmandsSense.dll",
-        "BepInEx/plugins/Sense",
-        "BepInEx/plugins/MoreCheckmarks",
-        "BepInEx/plugins/kmyuhkyuk-EFTApi",
-        "BepInEx/plugins/DynamicMaps",
-        "BepInEx/plugins/LootValue",
-        "BepInEx/plugins/CactusPie.RamCleanerInterval.dll",
-        "BepInEx/plugins/TYR_DeClutterer.dll"
-    ];
-
     public new static readonly ManualLogSource Logger = BepInEx.Logging.Logger.CreateLogSource("NarcoNet");
 
-    private readonly AlertWindow _downloadErrorWindow = new(
-        new Vector2(640f, 240f),
-        "Download failed!",
-        "There was an error updating mod files.\nPlease check BepInEx/LogOutput.log for more information.",
-        "QUIT"
-    );
+    // Services
+    private readonly IClientUIService _uiService;
+    private readonly IClientConfigService _configService;
+    private readonly IClientSyncService _syncService;
+    private readonly IClientInitializationService _initService;
+    private readonly ServerModule _server;
 
-    private readonly ProgressWindow _progressWindow =
-        new("Downloading Updates...", "Your game will need to be restarted\nafter update completes.");
-
-    private readonly AlertWindow _restartWindow =
-        new(new Vector2(480f, 200f), "Update Complete.", "Please restart your game to continue.");
-
-    private readonly UpdateWindow _updateWindow = new("Installed mods do not match server", "Would you like to update?");
-
+    // State
     private SyncPathFileList _addedFiles = [];
-    private ConfigEntry<bool>? _configDeleteRemovedFiles;
-
-    // Cartel distribution settings
-    private Dictionary<string, ConfigEntry<bool>>? _configSyncPathToggles;
+    private SyncPathFileList _updatedFiles = [];
+    private SyncPathFileList _removedFiles = [];
     private SyncPathFileList _createdDirectories = [];
-    private CancellationTokenSource _cts = new();
-    private int _downloadCount;
-
-    private List<Task?> _downloadTasks = [];
-    private List<string> _localExclusions = [];
-
-    private List<string>? _noRestart;
-
-    private List<string>? _optional;
-
-    private bool _pluginFinished;
     private SyncPathModFiles _previousSync = [];
     private SyncPathModFiles _remoteModFiles = [];
-    private SyncPathFileList _removedFiles = [];
-
+    private List<string> _localExclusions = [];
+    private List<string>? _optional;
     private List<string>? _required;
+    private List<string>? _noRestart;
+    private bool _pluginFinished;
+    private CancellationTokenSource _cts = new();
 
-    private ServerModule? _server;
-
-    private List<SyncPath>? _syncPaths = [];
-    private int _totalDownloadCount;
-    private SyncPathFileList _updatedFiles = [];
-
-    private int UpdateCount =>
-        EnabledSyncPaths
-            .Select(syncPath =>
-                _addedFiles[syncPath.Path].Count
-                + _updatedFiles[syncPath.Path].Count
-                + (_configDeleteRemovedFiles != null && (_configDeleteRemovedFiles.Value || syncPath.Enforced)
-                    ? _removedFiles[syncPath.Path].Count
-                    : 0)
-                + _createdDirectories[syncPath.Path].Count
-            )
-            .Sum();
-
-    private static bool IsHeadless => Chainloader.PluginInfos.ContainsKey("com.fika.headless");
-
-    private List<SyncPath> EnabledSyncPaths
+    /// <summary>
+    ///     Constructor - initializes services
+    /// </summary>
+    public NarcoPlugin()
     {
-        get
-        {
-            Debug.Assert(_syncPaths != null, nameof(_syncPaths) + " != null");
-            if (_syncPaths != null)
-            {
-                return _syncPaths.Where(syncPath =>
-                        _configSyncPathToggles != null && (_configSyncPathToggles[syncPath.Path].Value || syncPath.Enforced))
-                    .ToList();
-            }
-            return [];
-        }
+        _server = new ServerModule(Info.Metadata.Version);
+        _uiService = new ClientUIService();
+        _configService = new ClientConfigService();
+        _syncService = new ClientSyncService(Logger, _server);
+        _initService = new ClientInitializationService();
     }
 
+    private int UpdateCount =>
+        _syncService.GetUpdateCount(
+            _addedFiles,
+            _updatedFiles,
+            _removedFiles,
+            _createdDirectories,
+            _configService.EnabledSyncPaths,
+            _configService.DeleteRemovedFiles.Value
+        );
+
+    private List<SyncPath> EnabledSyncPaths => _configService.EnabledSyncPaths;
+
     private bool SilentMode =>
-        IsHeadless
-        || EnabledSyncPaths.All(syncPath =>
-            _configDeleteRemovedFiles != null && (syncPath.Silent
-                                                  || _addedFiles[syncPath.Path].Count == 0
-                                                  && _updatedFiles[syncPath.Path].Count == 0
-                                                  && (!(_configDeleteRemovedFiles.Value || syncPath.Enforced) ||
-                                                      _removedFiles[syncPath.Path].Count == 0)
-                                                  && _createdDirectories[syncPath.Path].Count == 0)
+        _syncService.IsSilentMode(
+            _addedFiles,
+            _updatedFiles,
+            _removedFiles,
+            _createdDirectories,
+            _configService.EnabledSyncPaths,
+            _configService.DeleteRemovedFiles.Value,
+            _configService.IsHeadless()
         );
 
     private bool NoRestartMode =>
-        EnabledSyncPaths.All(syncPath =>
-            _configDeleteRemovedFiles != null && (!syncPath.RestartRequired
-                                                  || _addedFiles[syncPath.Path].Count == 0
-                                                  && _updatedFiles[syncPath.Path].Count == 0
-                                                  && (!(_configDeleteRemovedFiles.Value || syncPath.Enforced) ||
-                                                      _removedFiles[syncPath.Path].Count == 0)
-                                                  && _createdDirectories[syncPath.Path].Count == 0)
+        !_syncService.IsRestartRequired(
+            _addedFiles,
+            _updatedFiles,
+            _removedFiles,
+            _createdDirectories,
+            _configService.EnabledSyncPaths,
+            _configService.DeleteRemovedFiles.Value
         );
 
     private List<string> Optional =>
@@ -144,7 +106,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 _addedFiles[syncPath.Path]
                     .Select(file => $"ADDED {file}")
                     .Concat(_updatedFiles[syncPath.Path].Select(file => $"UPDATED {file}"))
-                    .Concat(_configDeleteRemovedFiles != null && (_configDeleteRemovedFiles.Value || syncPath.Enforced)
+                    .Concat(_configService.DeleteRemovedFiles.Value || syncPath.Enforced
                         ? _removedFiles[syncPath.Path].Select(file => $"REMOVED {file}")
                         : [])
                     .Concat(_createdDirectories[syncPath.Path].Select(file => $@"CREATED {file}\"))
@@ -158,7 +120,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 _addedFiles[syncPath.Path]
                     .Select(file => $"ADDED {file}")
                     .Concat(_updatedFiles[syncPath.Path].Select(file => $"UPDATED {file}"))
-                    .Concat(_configDeleteRemovedFiles is { Value: true }
+                    .Concat(_configService.DeleteRemovedFiles.Value
                         ? _removedFiles[syncPath.Path].Select(file => $"REMOVED {file}")
                         : [])
                     .Concat(_createdDirectories[syncPath.Path].Select(file => $@"CREATED {file}\"))
@@ -171,13 +133,16 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             .SelectMany(syncPath =>
                 _addedFiles[syncPath.Path]
                     .Concat(_updatedFiles[syncPath.Path])
-                    .Concat(_configDeleteRemovedFiles != null && (_configDeleteRemovedFiles.Value || syncPath.Enforced)
+                    .Concat(_configService.DeleteRemovedFiles.Value || syncPath.Enforced
                         ? _removedFiles[syncPath.Path]
                         : [])
                     .Concat(_createdDirectories[syncPath.Path])
             )
             .ToList();
 
+    /// <summary>
+    ///     Unity lifecycle - registers console command
+    /// </summary>
     private void Awake()
     {
         ConsoleScreen.Processor.RegisterCommand(
@@ -188,153 +153,62 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 StartCoroutine(StartPlugin());
             }
         );
-
-        _server = new ServerModule(Info.Metadata.Version);
-
-        _configDeleteRemovedFiles = Config.Bind("General", "Delete Removed Files", true,
-            "Should the mod delete files that have been removed from the server?");
     }
 
+    /// <summary>
+    ///     Unity lifecycle - starts the plugin initialization
+    /// </summary>
     public void Start()
     {
         StartCoroutine(StartPlugin());
     }
 
+    /// <summary>
+    ///     Unity lifecycle - handles UI visibility management
+    /// </summary>
     public void Update()
     {
-        if (_updateWindow.Active || _progressWindow.Active || _restartWindow.Active || _downloadErrorWindow.Active)
-        {
-            if (Singleton<LoginUI>.Instantiated && Singleton<LoginUI>.Instance.gameObject.activeSelf)
-            {
-                Singleton<LoginUI>.Instance.gameObject.SetActive(false);
-            }
+        _uiService.HandleGameUIVisibility(_uiService.IsAnyWindowActive);
 
-            if (Singleton<PreloaderUI>.Instantiated && Singleton<PreloaderUI>.Instance.gameObject.activeSelf)
-            {
-                Singleton<PreloaderUI>.Instance.gameObject.SetActive(false);
-            }
-
-            if (Singleton<CommonUI>.Instantiated && Singleton<CommonUI>.Instance.gameObject.activeSelf)
-            {
-                Singleton<CommonUI>.Instance.gameObject.SetActive(false);
-            }
-        }
-        else if (_pluginFinished)
+        if (!_uiService.IsAnyWindowActive && _pluginFinished)
         {
             _pluginFinished = false;
-            if (Singleton<LoginUI>.Instantiated && !Singleton<LoginUI>.Instance.gameObject.activeSelf)
-            {
-                Singleton<LoginUI>.Instance.gameObject.SetActive(true);
-            }
-
-            if (Singleton<PreloaderUI>.Instantiated && !Singleton<PreloaderUI>.Instance.gameObject.activeSelf)
-            {
-                Singleton<PreloaderUI>.Instance.gameObject.SetActive(true);
-            }
-
-            if (Singleton<CommonUI>.Instantiated && !Singleton<CommonUI>.Instance.gameObject.activeSelf)
-            {
-                Singleton<CommonUI>.Instance.gameObject.SetActive(true);
-            }
+            _uiService.HandleGameUIVisibility(false);
         }
     }
 
+    /// <summary>
+    ///     Unity lifecycle - delegates UI rendering to service
+    /// </summary>
     private void OnGUI()
     {
-        if (!Singleton<CommonUI>.Instantiated)
-        {
-            return;
-        }
-
-        if (_restartWindow.Active)
-        {
-            _restartWindow.Draw(StartUpdaterProcess);
-        }
-
-        if (_progressWindow.Active)
-        {
-            _progressWindow.Draw(_downloadCount, _totalDownloadCount,
-                Required.Count != 0 || NoRestart.Count != 0 ? null : () => Task.Run(CancelUpdatingMods));
-        }
-
-        if (_updateWindow.Active)
-        {
-            _updateWindow.Draw(
-                (Optional.Count != 0 ? string.Join("\n", Optional) : "")
-                + (Optional.Count != 0 && Required.Count != 0 ? "\n\n" : "")
-                + (Required.Count != 0 ? "[Enforced]\n" + string.Join("\n", Required) : ""),
-                () => Task.Run(() => SyncMods(_addedFiles, _updatedFiles, _createdDirectories)),
-                Required.Count != 0 && Optional.Count == 0 ? null : SkipUpdatingMods
-            );
-        }
-
-        if (_downloadErrorWindow.Active)
-        {
-            _downloadErrorWindow.Draw(Application.Quit);
-        }
+        _uiService.DrawWindows();
     }
 
+    /// <summary>
+    ///     Disposes resources
+    /// </summary>
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    ///     Analyzes differences between local and remote files, then shows update UI or silently syncs
+    /// </summary>
     private void AnalyzeModFiles(SyncPathModFiles localModFiles)
     {
-        Sync.CompareModFiles(
-            Directory.GetCurrentDirectory(),
-            EnabledSyncPaths,
+        _syncService.AnalyzeModFiles(
             localModFiles,
             _remoteModFiles,
             _previousSync,
+            EnabledSyncPaths,
             out _addedFiles,
             out _updatedFiles,
             out _removedFiles,
             out _createdDirectories
         );
-
-        int addedCount = _addedFiles.SelectMany(path => path.Value).Count();
-        int updatedCount = _updatedFiles.SelectMany(path => path.Value).Count();
-        int removedCount = _removedFiles.SelectMany(path => path.Value).Count();
-
-        Logger.LogDebug($"{UpdateCount} file changes detected: {addedCount} added, {updatedCount} updated, {removedCount} removed");
-
-        if (addedCount > 0)
-        {
-            foreach (KeyValuePair<string, List<string>> syncPath in _addedFiles.Where(kvp => kvp.Value.Count > 0))
-            {
-                Logger.LogDebug($"  [{syncPath.Key}]");
-                foreach (string? file in syncPath.Value)
-                {
-                    Logger.LogDebug($"    + {file}");
-                }
-            }
-        }
-
-        if (updatedCount > 0)
-        {
-            foreach (KeyValuePair<string, List<string>> syncPath in _updatedFiles.Where(kvp => kvp.Value.Count > 0))
-            {
-                Logger.LogDebug($"  [{syncPath.Key}]");
-                foreach (string? file in syncPath.Value)
-                {
-                    Logger.LogDebug($"    * {file}");
-                }
-            }
-        }
-
-        if (removedCount > 0)
-        {
-            foreach (KeyValuePair<string, List<string>> syncPath in _removedFiles.Where(kvp => kvp.Value.Count > 0))
-            {
-                Logger.LogDebug($"  [{syncPath.Key}]");
-                foreach (string? file in syncPath.Value)
-                {
-                    Logger.LogDebug($"    - {file}");
-                }
-            }
-        }
 
         if (UpdateCount > 0)
         {
@@ -344,15 +218,23 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             }
             else
             {
-                _updateWindow.Show();
+                _uiService.ShowUpdateWindow(
+                    Optional,
+                    Required,
+                    () => Task.Run(() => SyncMods(_addedFiles, _updatedFiles, _createdDirectories)),
+                    Required.Count != 0 && Optional.Count == 0 ? null : SkipUpdatingMods
+                );
             }
         }
         else
         {
-            WriteNarcoNetData();
+            _syncService.WriteNarcoNetData(_remoteModFiles, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value);
         }
     }
 
+    /// <summary>
+    ///     Handles user skipping optional updates - only syncs enforced changes
+    /// </summary>
     private void SkipUpdatingMods()
     {
         SyncPathFileList enforcedAddedFiles = EnabledSyncPaths.ToDictionary(
@@ -384,143 +266,99 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         else
         {
             _pluginFinished = true;
-            _updateWindow.Hide();
+            _uiService.HideAllWindows();
         }
     }
 
+    /// <summary>
+    ///     Downloads and synchronizes mod files, showing progress UI
+    /// </summary>
     private async Task SyncMods(SyncPathFileList filesToAdd, SyncPathFileList filesToUpdate,
         SyncPathFileList directoriesToCreate)
     {
-        _updateWindow.Hide();
+        _uiService.HideAllWindows();
 
-        if (!Directory.Exists(PendingUpdatesDir))
+        if (!_configService.IsHeadless())
         {
-            Directory.CreateDirectory(PendingUpdatesDir);
+            _uiService.ShowProgressWindow();
         }
 
-        foreach (SyncPath syncPath in EnabledSyncPaths)
+        Progress<(int current, int total)> progress = new(p =>
         {
-            foreach (string dir in directoriesToCreate[syncPath.Path])
+            _uiService.UpdateProgress(p.current, p.total,
+                Required.Count != 0 || NoRestart.Count != 0 ? null : () => Task.Run(CancelUpdatingMods));
+        });
+
+        try
+        {
+            await _syncService.SyncModsAsync(
+                filesToAdd,
+                filesToUpdate,
+                directoriesToCreate,
+                EnabledSyncPaths,
+                _configService.DeleteRemovedFiles.Value,
+                PendingUpdatesDir,
+                progress,
+                _cts.Token
+            );
+
+            _uiService.HideProgressWindow();
+
+            if (!_cts.IsCancellationRequested)
             {
-                try
+                _syncService.WriteNarcoNetData(_remoteModFiles, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value);
+
+                if (NoRestartMode)
                 {
-                    Directory.CreateDirectory(dir);
+                    Directory.Delete(PendingUpdatesDir, true);
+                    _pluginFinished = true;
                 }
-                catch (Exception e)
+                else if (!_configService.IsHeadless())
                 {
-                    Logger.LogError("Failed to create directory: " + e);
+                    _uiService.ShowRestartWindow(StartUpdaterProcess);
+                }
+                else
+                {
+                    StartUpdaterProcess();
                 }
             }
         }
-
-        _downloadCount = 0;
-        _totalDownloadCount = 0;
-
-        SemaphoreSlim limiter = new(8);
-        SyncPathFileList filesToDownload = EnabledSyncPaths
-            .Select(syncPath =>
-                new KeyValuePair<string, List<string>>(syncPath.Path,
-                    [.. filesToAdd[syncPath.Path], .. filesToUpdate[syncPath.Path]]))
-            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-        Logger.LogDebug($"Downloading {UpdateCount} files...");
-        _downloadTasks = EnabledSyncPaths
-            .SelectMany(syncPath =>
-                filesToDownload.TryGetValue(syncPath.Path, out List<string>? pathFilesToDownload)
-                    ? pathFilesToDownload.Select(file =>
-                        _server?.DownloadFile(file, syncPath.RestartRequired ? PendingUpdatesDir : Directory.GetCurrentDirectory(),
-                            limiter, _cts.Token)
-                    )
-                    : []
-            )
-            .ToList();
-
-        _totalDownloadCount = _downloadTasks.Count;
-
-        if (!IsHeadless)
+        catch (Exception)
         {
-            _progressWindow.Show();
-        }
-
-        while (_downloadTasks.Count > 0 && !_cts.IsCancellationRequested)
-        {
-            Task task = await Task.WhenAny(_downloadTasks!);
-
-            try
+            _uiService.HideProgressWindow();
+            if (!_configService.IsHeadless())
             {
-                await task;
+                _uiService.ShowErrorWindow(Application.Quit);
             }
-            catch (Exception e)
-            {
-                if (e is TaskCanceledException && _cts.IsCancellationRequested)
-                {
-                    continue;
-                }
-
-                _cts.Cancel();
-                _progressWindow.Hide();
-                if (!IsHeadless)
-                {
-                    _downloadErrorWindow.Show();
-                }
-            }
-
-            _downloadTasks.Remove(task);
-            _downloadCount++;
-        }
-
-        _downloadTasks.Clear();
-        _progressWindow.Hide();
-
-        Logger.LogDebug("All files downloaded successfully");
-
-        if (!_cts.IsCancellationRequested)
-        {
-            WriteNarcoNetData();
-
-            if (NoRestartMode)
-            {
-                Directory.Delete(PendingUpdatesDir, true);
-                _pluginFinished = true;
-            }
-            else if (!IsHeadless)
-            {
-                _restartWindow.Show();
-            }
-            else
-            {
-                StartUpdaterProcess();
-            }
+            throw;
         }
     }
 
+    /// <summary>
+    ///     Cancels the download process and cleans up pending updates
+    /// </summary>
     private async Task CancelUpdatingMods()
     {
-        _progressWindow.Hide();
+        _uiService.HideProgressWindow();
         _cts.Cancel();
 
-        await Task.WhenAll(_downloadTasks!);
-
-        Directory.Delete(PendingUpdatesDir, true);
-        _pluginFinished = true;
-    }
-
-    private void WriteNarcoNetData()
-    {
-        VFS.WriteTextFile(PreviousSyncPath, Json.Serialize(_remoteModFiles));
-        if (EnabledSyncPaths.Any(syncPath =>
-                _configDeleteRemovedFiles != null && (_configDeleteRemovedFiles.Value || syncPath.Enforced) &&
-                _removedFiles[syncPath.Path].Count != 0))
+        if (Directory.Exists(PendingUpdatesDir))
         {
-            VFS.WriteTextFile(RemovedFilesPath, Json.Serialize(_removedFiles.SelectMany(kvp => kvp.Value).ToList()));
+            Directory.Delete(PendingUpdatesDir, true);
         }
+
+        _pluginFinished = true;
+        await Task.CompletedTask;
     }
 
+    /// <summary>
+    ///     Starts the external updater process to apply pending updates and restart the game
+    /// </summary>
     private void StartUpdaterProcess()
     {
         List<string> options = [];
 
-        if (IsHeadless)
+        if (_configService.IsHeadless())
         {
             options.Add("--silent");
         }
@@ -540,6 +378,9 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         Application.Quit();
     }
 
+    /// <summary>
+    ///     Main plugin initialization coroutine - fetches server config and checks for updates
+    /// </summary>
     private IEnumerator StartPlugin()
     {
         _cts = new CancellationTokenSource();
@@ -551,11 +392,11 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         }
 
         Logger.LogDebug("Requesting server version...");
-        Task<string>? versionTask = _server?.GetNarcoNetVersion();
+        Task<string> versionTask = _server.GetNarcoNetVersion();
         yield return new WaitUntil(() => versionTask is { IsCompleted: true });
         try
         {
-            string? version = versionTask?.Result;
+            string? version = versionTask.Result;
 
             Logger.LogInfo($"NarcoNet plugin loaded");
             Logger.LogDebug($"Server version: {version}");
@@ -575,11 +416,12 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         }
 
         Logger.LogDebug("Requesting sync paths...");
-        Task<List<SyncPath>>? syncPathTask = _server?.GetLocalSyncPaths();
+        Task<List<SyncPath>> syncPathTask = _server.GetLocalSyncPaths();
         yield return new WaitUntil(() => syncPathTask is { IsCompleted: true });
+        List<SyncPath>? syncPaths;
         try
         {
-            _syncPaths = syncPathTask?.Result;
+            syncPaths = syncPathTask.Result;
         }
         catch (Exception e)
         {
@@ -596,66 +438,35 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         }
 
         Logger.LogDebug("Validating sync paths...");
-        if (_syncPaths != null)
+        string? validationError = _initService.ValidateSyncPaths(syncPaths, Directory.GetCurrentDirectory());
+        if (validationError != null)
         {
-            foreach (SyncPath syncPath in _syncPaths)
-            {
-                if (Path.IsPathRooted(syncPath.Path))
-                {
-                    Chainloader.DependencyErrors.Add(
-                        $"Could not load {Info.Metadata.Name} due to invalid sync path. Paths must be relative to SPT server root! Invalid path '{syncPath}'"
-                    );
-                    yield break;
-                }
+            Chainloader.DependencyErrors.Add(
+                $"Could not load {Info.Metadata.Name} due to invalid sync path. {validationError}"
+            );
+            yield break;
+        }
 
-                if (!Path.GetFullPath(syncPath.Path).StartsWith(Directory.GetCurrentDirectory()))
-                {
-                    Chainloader.DependencyErrors.Add(
-                        $"Could not load {Info.Metadata.Name} due to invalid sync path. Paths must be within SPT server root! Invalid path '{syncPath}'"
-                    );
-                    yield break;
-                }
-            }
+        Logger.LogDebug("Checking for data migration...");
+        new Migrator(Directory.GetCurrentDirectory()).TryMigrate(Info.Metadata.Version, syncPaths);
 
-            Logger.LogDebug("Checking for data migration...");
-            new Migrator(Directory.GetCurrentDirectory()).TryMigrate(Info.Metadata.Version, _syncPaths);
-
-            Logger.LogDebug("Loading configuration...");
-
-            try
-            {
-                _configSyncPathToggles = _syncPaths
-                    .Select(syncPath => new KeyValuePair<string, ConfigEntry<bool>>(
-                        syncPath.Path,
-                        Config.Bind(
-                            "Synced Paths",
-                            syncPath.Name.Replace("\\", "/"),
-                            syncPath.Enabled,
-                            new ConfigDescription(
-                                $"Should the mod attempt to sync files from {syncPath.Path.Replace("\\", "/")}",
-                                null,
-                                new ConfigurationManagerAttributes { ReadOnly = syncPath.Enforced }
-                            )
-                        )
-                    ))
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(
-                    $"Failed to bind sync path configuration:\n{e}");
-                Chainloader.DependencyErrors.Add(
-                    $"Could not load {Info.Metadata.Name} due to error binding sync path configs. Please check your server configuration and try again."
-                );
-            }
+        Logger.LogDebug("Loading configuration...");
+        try
+        {
+            _configService.Initialize(Config, syncPaths);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError($"Failed to bind sync path configuration:\n{e}");
+            Chainloader.DependencyErrors.Add(
+                $"Could not load {Info.Metadata.Name} due to error binding sync path configs. Please check your server configuration and try again."
+            );
         }
 
         Logger.LogDebug("Loading previous sync data...");
         try
         {
-            _previousSync = VFS.Exists(PreviousSyncPath)
-                ? Json.Deserialize<SyncPathModFiles>(VFS.ReadTextFile(PreviousSyncPath))
-                : [];
+            _previousSync = _initService.LoadPreviousSync(PreviousSyncPath);
         }
         catch (Exception e)
         {
@@ -667,33 +478,19 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         }
 
         Logger.LogDebug("Loading local exclusions...");
-        if (IsHeadless && !VFS.Exists(LocalExclusionsPath))
-        {
-            try
-            {
-                VFS.WriteTextFile(LocalExclusionsPath, Json.Serialize(HeadlessDefaultExclusions));
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e);
-                Chainloader.DependencyErrors.Add(
-                    $"Could not load {Info.Metadata.Name} due to error writing local exclusions file for headless client. Please check BepInEx/LogOutput.log for more information."
-                );
-                yield break;
-            }
-        }
-
         try
         {
-            _localExclusions = VFS.Exists(LocalExclusionsPath)
-                ? Json.Deserialize<List<string>>(VFS.ReadTextFile(LocalExclusionsPath))
-                : [];
+            _localExclusions = _initService.LoadLocalExclusions(
+                LocalExclusionsPath,
+                _configService.IsHeadless(),
+                _configService.GetHeadlessDefaultExclusions()
+            );
         }
         catch (Exception e)
         {
             Logger.LogError(e);
             Chainloader.DependencyErrors.Add(
-                $"Could not load {Info.Metadata.Name} due to malformed local exclusion data. Please check NarcoNet_Data/Exclusions.json for errors or delete it, and try again."
+                $"Could not load {Info.Metadata.Name} due to error with local exclusions. Please check BepInEx/LogOutput.log for more information."
             );
             yield break;
         }
@@ -701,11 +498,11 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         Logger.LogDebug("Requesting exclusions from server...");
 
         List<string>? exclusions;
-        Task<List<string>>? exclusionsTask = _server?.GetListExclusions();
+        Task<List<string>> exclusionsTask = _server.GetListExclusions();
         yield return new WaitUntil(() => exclusionsTask is { IsCompleted: true });
         try
         {
-            exclusions = exclusionsTask?.Result;
+            exclusions = exclusionsTask.Result;
         }
         catch (Exception e)
         {
@@ -753,39 +550,19 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             VFS.WriteTextFile(LocalHashesPath, Json.Serialize(localModFiles));
 
             Logger.LogDebug("Requesting remote hashes...");
-            Task<Dictionary<string, Dictionary<string, string>>>? remoteHashesTask =
-                _server?.GetRemoteHashes(EnabledSyncPaths);
+            Task<Dictionary<string, Dictionary<string, string>>> remoteHashesTask =
+                _server.GetRemoteHashes(EnabledSyncPaths);
             yield return new WaitUntil(() => remoteHashesTask is { IsCompleted: true });
             try
             {
-                Dictionary<string, Dictionary<string, string>>? remoteHashes = remoteHashesTask?.Result;
+                Dictionary<string, Dictionary<string, string>>? remoteHashes = remoteHashesTask.Result;
+                if (remoteHashes == null)
+                {
+                    Logger.LogError("Remote hashes task returned null");
+                    yield break;
+                }
 
-                List<Regex> localExclusionsForRemote = _localExclusions.Select(Glob.CreateNoEnd).ToList();
-                _remoteModFiles = EnabledSyncPaths
-                    .Select(syncPath =>
-                        {
-                            // Get remote hashes for this path, or empty dict if path doesn't exist on server
-                            Dictionary<string, string>? remotePathHashes = remoteHashes?.TryGetValue(syncPath.Path, out Dictionary<string, string>? hashes) == true ? hashes : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-                            if (!syncPath.Enforced)
-                            {
-                                // Filter out locally excluded files for non-enforced paths
-                                remotePathHashes = remotePathHashes
-                                    .Where(kvp => !Sync.IsExcluded(localExclusionsForRemote, kvp.Key))
-                                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
-                            }
-
-                            Dictionary<string, ModFile> remoteModFilesForPath = remotePathHashes
-                                .ToDictionary(
-                                    kvp => kvp.Key,
-                                    kvp => new ModFile(kvp.Value, kvp.Key.EndsWith("\\") || kvp.Key.EndsWith("/")),
-                                    StringComparer.OrdinalIgnoreCase
-                                );
-
-                            return new KeyValuePair<string, Dictionary<string, ModFile>>(syncPath.Path, remoteModFilesForPath);
-                        }
-                    )
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+                _remoteModFiles = _initService.BuildRemoteModFiles(EnabledSyncPaths, remoteHashes, _localExclusions);
             }
             catch (Exception e)
             {
@@ -817,7 +594,6 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 Chainloader.DependencyErrors.Add(
                     $"Could not load {Info.Metadata.Name} due to error analyzing mod files: {e.Message}"
                 );
-                yield break;
             }
         }
     }
@@ -826,7 +602,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
     {
         if (disposing)
         {
-            _cts?.Dispose();
+            _cts.Dispose();
         }
     }
 }

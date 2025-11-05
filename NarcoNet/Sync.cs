@@ -195,7 +195,7 @@ public static class Sync
 
     public static async Task<ModFile> CreateModFile(string file)
     {
-        string hash = "";
+        var hash = "";
 
         if (Directory.Exists(file))
         {

@@ -5,8 +5,6 @@ using UnityEngine;
 
 namespace NarcoNet.Services;
 
-using SyncPathFileList = Dictionary<string, List<string>>;
-
 /// <summary>
 ///     Manages client UI windows and user interactions
 /// </summary>

@@ -225,7 +225,7 @@ public class HealthCheckTests : IDisposable
 
         // Assert
         result.Status.Should().Be(HealthStatus.Degraded);
-        List<string>? suspiciousFiles = result.Data["SuspiciousFiles"] as List<string>;
+        var suspiciousFiles = result.Data["SuspiciousFiles"] as List<string>;
         suspiciousFiles.Should().Contain("file.exe");
     }
 

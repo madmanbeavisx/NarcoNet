@@ -40,7 +40,7 @@ public class ServerModule(Version pluginVersion)
 
         VFS.CreateDirectory(downloadPath.GetDirectory());
 
-        int retryCount = 0;
+        var retryCount = 0;
 
         await limiter.WaitAsync(cancellationToken);
         while (!cancellationToken.IsCancellationRequested)
@@ -54,8 +54,10 @@ public class ServerModule(Version pluginVersion)
                         client.Timeout = TimeSpan.FromMinutes(3 * retryCount);
                     }
 
+                    // URL-encode the file path to preserve ../ and other special characters
+                    string encodedPath = Uri.EscapeDataString(file.Replace("\\", "/"));
                     using (Stream responseStream =
-                           await client.GetStreamAsync($"{RequestHandler.Host}/narconet/fetch/{file}"))
+                           await client.GetStreamAsync($"{RequestHandler.Host}/narconet/fetch/{encodedPath}"))
                     using (FileStream filestream = new(downloadPath, FileMode.Create))
                     {
                         await responseStream.CopyToAsync(filestream, 81920, cancellationToken);
@@ -109,7 +111,7 @@ public class ServerModule(Version pluginVersion)
 
     internal async Task<Dictionary<string, Dictionary<string, string>>> GetRemoteHashes(List<SyncPath> paths)
     {
-        if (paths == null || paths.Count == 0)
+        if (paths.Count == 0)
         {
             NarcoPlugin.Logger.LogWarning("No sync paths provided");
             return new Dictionary<string, Dictionary<string, string>>();
@@ -120,7 +122,7 @@ public class ServerModule(Version pluginVersion)
             string json = await GetJsonTask($"/narconet/hashes?path={string.Join("&path=",
                 paths.Select(path => Uri.EscapeDataString(path.Path.Replace(@"\", "/"))))}");
 
-            Dictionary<string, Dictionary<string, string>>? rawData =
+            var rawData =
                 Json.Deserialize<Dictionary<string, Dictionary<string, string>>>(json);
 
             return rawData.ToDictionary(

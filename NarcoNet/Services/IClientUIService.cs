@@ -1,8 +1,4 @@
-using NarcoNet.Utilities;
-
 namespace NarcoNet.Services;
-
-using SyncPathFileList = Dictionary<string, List<string>>;
 
 /// <summary>
 ///     Service interface for managing client UI windows and user interactions

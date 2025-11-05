@@ -35,7 +35,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger);
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task Operation()
         {
@@ -57,7 +57,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger);
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task Operation()
         {
@@ -84,9 +84,9 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 3, TimeSpan.FromMilliseconds(10));
-        int executionCount = 0;
+        var executionCount = 0;
 
-        async Task Operation()
+        Task Operation()
         {
             executionCount++;
             throw new IOException("Permanent failure");
@@ -107,9 +107,9 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger);
-        int executionCount = 0;
+        var executionCount = 0;
 
-        async Task Operation()
+        Task Operation()
         {
             executionCount++;
             throw new InvalidOperationException("Non-retryable");
@@ -130,7 +130,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 2, TimeSpan.FromMilliseconds(10));
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task Operation()
         {
@@ -156,7 +156,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 2, TimeSpan.FromMilliseconds(10));
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task Operation()
         {
@@ -182,7 +182,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 2, TimeSpan.FromMilliseconds(10));
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task Operation()
         {
@@ -209,9 +209,9 @@ public class RetryPolicyTests
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 5, TimeSpan.FromSeconds(10));
         CancellationTokenSource cts = new();
-        int executionCount = 0;
+        var executionCount = 0;
 
-        async Task Operation()
+        Task Operation()
         {
             executionCount++;
             throw new IOException("Fail");
@@ -253,7 +253,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 3, TimeSpan.FromMilliseconds(10));
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task<string> Operation()
         {
@@ -283,7 +283,7 @@ public class RetryPolicyTests
         RetryPolicy policy = new(logger, 2, TimeSpan.FromMilliseconds(10));
         policy.AddRetryableException<ArgumentException>();
 
-        int executionCount = 0;
+        var executionCount = 0;
 
         async Task Operation()
         {
@@ -309,7 +309,7 @@ public class RetryPolicyTests
         // Arrange
         TestLogger logger = new();
         RetryPolicy policy = new(logger, 3, TimeSpan.FromMilliseconds(100));
-        int executionCount = 0;
+        var executionCount = 0;
         List<DateTime> timestamps =
         [
         ];

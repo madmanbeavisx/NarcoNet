@@ -3,8 +3,13 @@
     <File Path=".gitignore" />
     <File Path=".gitattributes" />
     <File Path="test-endpoints.ps1" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="UrGrannyOnFent.NarcoNet.sln.DotSettings" />
+    <File Path="UrGrannyOnFent.NarcoNet.sln.DotSettings.user" />
   </Folder>
   <Project Path="NarcoNet.Server\NarcoNet.Server.csproj" Type="Classic C#" />
+  <Project Path="NarcoNet.Tests\NarcoNet.Tests.csproj" Type="Classic C#" />
   <Project Path="NarcoNet.UI\NarcoNet.UI.csproj" Type="Classic C#" />
   <Project Path="NarcoNet.Updater.Tests\NarcoNet.Updater.Tests.csproj" Type="Classic C#" />
   <Project Path="NarcoNet.Updater\NarcoNet.Updater.csproj" Type="Classic C#" />

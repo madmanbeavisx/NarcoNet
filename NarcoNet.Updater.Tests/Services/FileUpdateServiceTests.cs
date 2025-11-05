@@ -169,7 +169,7 @@ public class FileUpdateServiceTests : IDisposable
         string targetFile = Path.Combine(_testDirectory, "test.txt");
         File.Exists(targetFile).Should().BeTrue();
         File.ReadAllText(targetFile).Should().Be("test content");
-        _logger.ContainsMessage("Successfully updated").Should().BeTrue();
+        _logger.ContainsMessage("File updated:").Should().BeTrue();
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public class FileUpdateServiceTests : IDisposable
         await service.DeleteRemovedFilesAsync();
 
         // Assert
-        _logger.ContainsMessage("No files to remove").Should().BeTrue();
+        _logger.ContainsMessage("Removed files list is empty").Should().BeTrue();
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public class FileUpdateServiceTests : IDisposable
 
         // Assert
         File.Exists(fileToDelete).Should().BeFalse();
-        _logger.ContainsMessage("Successfully deleted").Should().BeTrue();
+        _logger.ContainsMessage("File deleted:").Should().BeTrue();
     }
 
     [Fact]
@@ -280,7 +280,7 @@ public class FileUpdateServiceTests : IDisposable
         await service.DeleteRemovedFilesAsync();
 
         // Assert
-        _logger.ContainsMessage("does not exist").Should().BeTrue();
+        _logger.ContainsMessage("File already removed:").Should().BeTrue();
     }
 
     [Fact]

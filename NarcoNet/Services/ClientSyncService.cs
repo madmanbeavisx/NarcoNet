@@ -10,20 +10,11 @@ using SyncPathModFiles = Dictionary<string, Dictionary<string, ModFile>>;
 /// <summary>
 ///     Handles file synchronization operations for the client
 /// </summary>
-public class ClientSyncService : IClientSyncService
+public class ClientSyncService(ManualLogSource logger, ServerModule serverModule) : IClientSyncService
 {
     private static readonly string NarcoNetDir = Path.Combine(Directory.GetCurrentDirectory(), "NarcoNet_Data");
     private static readonly string PreviousSyncPath = Path.Combine(NarcoNetDir, "PreviousSync.json");
     private static readonly string RemovedFilesPath = Path.Combine(NarcoNetDir, "RemovedFiles.json");
-
-    private readonly ManualLogSource _logger;
-    private readonly ServerModule _serverModule;
-
-    public ClientSyncService(ManualLogSource logger, ServerModule serverModule)
-    {
-        _logger = logger;
-        _serverModule = serverModule;
-    }
 
     /// <inheritdoc/>
     public void AnalyzeModFiles(
@@ -52,7 +43,7 @@ public class ClientSyncService : IClientSyncService
         int updatedCount = updatedFiles.SelectMany(path => path.Value).Count();
         int removedCount = removedFiles.SelectMany(path => path.Value).Count();
 
-        _logger.LogDebug($"File changes detected: {addedCount} added, {updatedCount} updated, {removedCount} removed");
+        logger.LogDebug($"File changes detected: {addedCount} added, {updatedCount} updated, {removedCount} removed");
 
         LogFileChanges("Added", addedFiles);
         LogFileChanges("Updated", updatedFiles);
@@ -86,7 +77,7 @@ public class ClientSyncService : IClientSyncService
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError($"Failed to create directory: {e}");
+                    logger.LogError($"Failed to create directory: {e}");
                 }
             }
         }
@@ -100,13 +91,13 @@ public class ClientSyncService : IClientSyncService
             ))
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
-        _logger.LogDebug($"Downloading files...");
+        logger.LogDebug($"Downloading files...");
 
         List<Task> downloadTasks = enabledSyncPaths
             .SelectMany(syncPath =>
                 filesToDownload.TryGetValue(syncPath.Path, out List<string>? pathFilesToDownload)
                     ? pathFilesToDownload.Select(file =>
-                        _serverModule.DownloadFile(
+                        serverModule.DownloadFile(
                             file,
                             syncPath.RestartRequired ? pendingUpdatesDir : Directory.GetCurrentDirectory(),
                             limiter,
@@ -118,12 +109,12 @@ public class ClientSyncService : IClientSyncService
             .ToList();
 
         int totalDownloadCount = downloadTasks.Count;
-        int downloadCount = 0;
+        var downloadCount = 0;
 
         // Download files with progress reporting
         while (downloadTasks.Count > 0 && !cancellationToken.IsCancellationRequested)
         {
-            Task task = await Task.WhenAny(downloadTasks!);
+            Task task = await Task.WhenAny(downloadTasks);
 
             try
             {
@@ -136,7 +127,7 @@ public class ClientSyncService : IClientSyncService
                     continue;
                 }
 
-                _logger.LogError($"Download failed: {e.Message}");
+                logger.LogError($"Download failed: {e.Message}");
                 throw;
             }
 
@@ -145,7 +136,7 @@ public class ClientSyncService : IClientSyncService
             progress.Report((downloadCount, totalDownloadCount));
         }
 
-        _logger.LogDebug("All files downloaded successfully");
+        logger.LogDebug("All files downloaded successfully");
     }
 
     /// <inheritdoc/>
@@ -232,7 +223,7 @@ public class ClientSyncService : IClientSyncService
         {
             foreach (KeyValuePair<string, List<string>> syncPath in changes.Where(kvp => kvp.Value.Count > 0))
             {
-                _logger.LogDebug($"  [{syncPath.Key}]");
+                logger.LogDebug($"  [{syncPath.Key}]");
                 string prefix = changeType switch
                 {
                     "Added" => "+",
@@ -243,7 +234,7 @@ public class ClientSyncService : IClientSyncService
 
                 foreach (string file in syncPath.Value)
                 {
-                    _logger.LogDebug($"    {prefix} {file}");
+                    logger.LogDebug($"    {prefix} {file}");
                 }
             }
         }

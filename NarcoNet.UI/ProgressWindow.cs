@@ -181,7 +181,7 @@ internal class CancelButton : Bordered
         }
         else
         {
-            buttonColor = Color.Lerp(Colors.Secondary, Colors.SecondaryLight, _hoverTransition);
+            buttonColor = Color.Lerp(Colors.SecondaryDark, Colors.SecondaryLight, _hoverTransition);
         }
 
         Color textColor = Colors.White;

@@ -299,7 +299,6 @@ public class FileUpdateService : IFileUpdateService
         catch (Exception ex)
         {
             _logger.LogException(ex, "Failed to clean empty directories");
-            // Not a big deal - keep moving
         }
     }
 }
