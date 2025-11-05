@@ -1,3 +1,5 @@
+using NarcoNet.Utilities;
+
 namespace NarcoNet.Server.Models;
 
 /// <summary>

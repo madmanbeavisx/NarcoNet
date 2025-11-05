@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using JetBrains.Annotations;
 
 using NarcoNet.Server.Models;
+using NarcoNet.Utilities;
 
 using SPTarkov.DI.Annotations;
 
@@ -193,24 +194,22 @@ public class ConfigService
         // Build the final config with built-in sync paths
         var syncPaths = new List<SyncPath>
         {
-            new()
-            {
-                Enabled = true,
-                Enforced = true,
-                Silent = true,
-                RestartRequired = false,
-                Path = "NarcoNet.Updater.exe",
-                Name = "(Builtin) NarcoNet Updater"
-            },
-            new()
-            {
-                Enabled = true,
-                Enforced = true,
-                Silent = true,
-                RestartRequired = true,
-                Path = "../BepInEx/plugins/MadManBeavis-NarcoNet",
-                Name = "(Builtin) NarcoNet Plugin"
-            }
+            new(
+                Path: "NarcoNet.Updater.exe",
+                Name: "(Builtin) NarcoNet Updater",
+                Enabled: true,
+                Enforced: true,
+                Silent: true,
+                RestartRequired: false
+            ),
+            new(
+                Path: "../BepInEx/plugins/MadManBeavis-NarcoNet",
+                Name: "(Builtin) NarcoNet Plugin",
+                Enabled: true,
+                Enforced: true,
+                Silent: true,
+                RestartRequired: true
+            )
         };
 
         syncPaths.AddRange(rawSyncPaths);
@@ -282,15 +281,14 @@ public class ConfigService
                 if (item is string pathStr)
                 {
                     // Simple string format
-                    syncPaths.Add(new SyncPath
-                    {
-                        Path = pathStr,
-                        Name = pathStr,
-                        Enabled = true,
-                        Enforced = false,
-                        Silent = false,
-                        RestartRequired = true
-                    });
+                    syncPaths.Add(new SyncPath(
+                        Path: pathStr,
+                        Name: pathStr,
+                        Enabled: true,
+                        Enforced: false,
+                        Silent: false,
+                        RestartRequired: true
+                    ));
                 }
                 else if (item is Dictionary<object, object> dict)
                 {
@@ -299,15 +297,14 @@ public class ConfigService
                         ? p.ToString()
                         : throw new InvalidOperationException("Missing 'path' in syncPath object");
 
-                    syncPaths.Add(new SyncPath
-                    {
-                        Path = path!,
-                        Name = dict.TryGetValue("name", out object? n) ? n.ToString() ?? path! : path!,
-                        Enabled = !dict.TryGetValue("enabled", out object? e) || e is not bool enabled || enabled,
-                        Enforced = dict.TryGetValue("enforced", out object? enf) && enf is bool and true,
-                        Silent = dict.TryGetValue("silent", out object? s) && s is bool and true,
-                        RestartRequired = !dict.TryGetValue("restartRequired", out object? r) || r is not bool restart || restart
-                    });
+                    syncPaths.Add(new SyncPath(
+                        Path: path!,
+                        Name: dict.TryGetValue("name", out object? n) ? n.ToString() ?? path! : path!,
+                        Enabled: !dict.TryGetValue("enabled", out object? e) || e is not bool enabled || enabled,
+                        Enforced: dict.TryGetValue("enforced", out object? enf) && enf is bool and true,
+                        Silent: dict.TryGetValue("silent", out object? s) && s is bool and true,
+                        RestartRequired: !dict.TryGetValue("restartRequired", out object? r) || r is not bool restart || restart
+                    ));
                 }
             }
         }
@@ -335,29 +332,27 @@ public class ConfigService
                 {
                     // String path
                     var pathStr = node.GetValue<string>();
-                    rawSyncPaths.Add(new SyncPath
-                    {
-                        Path = pathStr,
-                        Name = pathStr,
-                        Enabled = true,
-                        Enforced = false,
-                        Silent = false,
-                        RestartRequired = true
-                    });
+                    rawSyncPaths.Add(new SyncPath(
+                        Path: pathStr,
+                        Name: pathStr,
+                        Enabled: true,
+                        Enforced: false,
+                        Silent: false,
+                        RestartRequired: true
+                    ));
                 }
                 else if (node is JsonObject obj)
                 {
                     // Object path
                     string path = obj["path"]?.GetValue<string>() ?? throw new InvalidOperationException("Missing 'path' in syncPath object");
-                    rawSyncPaths.Add(new SyncPath
-                    {
-                        Path = path,
-                        Name = obj["name"]?.GetValue<string>() ?? path,
-                        Enabled = obj["enabled"]?.GetValue<bool>() ?? true,
-                        Enforced = obj["enforced"]?.GetValue<bool>() ?? false,
-                        Silent = obj["silent"]?.GetValue<bool>() ?? false,
-                        RestartRequired = obj["restartRequired"]?.GetValue<bool>() ?? true
-                    });
+                    rawSyncPaths.Add(new SyncPath(
+                        Path: path,
+                        Name: obj["name"]?.GetValue<string>() ?? path,
+                        Enabled: obj["enabled"]?.GetValue<bool>() ?? true,
+                        Enforced: obj["enforced"]?.GetValue<bool>() ?? false,
+                        Silent: obj["silent"]?.GetValue<bool>() ?? false,
+                        RestartRequired: obj["restartRequired"]?.GetValue<bool>() ?? true
+                    ));
                 }
             }
         }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 
 using NarcoNet.Server.Models;
 using NarcoNet.Server.Utilities;
+using NarcoNet.Utilities;
 
 using SPTarkov.DI.Annotations;
 
@@ -103,7 +104,7 @@ public class SyncService
         FileInfo fileInfo = new(file);
         if (fileInfo.Attributes.HasFlag(FileAttributes.Directory))
         {
-            return new ModFile { Hash = "", IsDirectory = true };
+            return new ModFile("", true);
         }
 
         int retryCount = 0;
@@ -115,14 +116,14 @@ public class SyncService
                 try
                 {
                     string hash = await FileHasher.HashFileAsync(file, cancellationToken);
-                    return new ModFile { Hash = hash, IsDirectory = false };
+                    return new ModFile(hash, false);
                 }
                 finally
                 {
                     _limiter.Release();
                 }
             }
-            catch (IOException ex) when (retryCount < 5)
+            catch (IOException) when (retryCount < 5)
             {
                 _logger.LogDebug("File '{File}' is locked, retrying... (Attempt {RetryCount}/5)", file, retryCount);
                 await Task.Delay(500, cancellationToken);
