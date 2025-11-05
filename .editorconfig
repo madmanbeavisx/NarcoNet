@@ -41,6 +41,18 @@ dotnet_diagnostic.IDE0251.severity = warning # Use nameof for argument expressio
 dotnet_diagnostic.IDE0300.severity = warning # Prefer collection expressions
 dotnet_diagnostic.IDE0039.severity = warning # Use local function
 dotnet_diagnostic.IDE0040.severity = suggestion # Add accessibility modifiers
+dotnet_diagnostic.IDE0160.severity = none # Convert to block scoped namespace
+dotnet_diagnostic.IDE0008.severity = none # Use explicit type instead of 'var'
+dotnet_diagnostic.IDE0048.severity = none
+dotnet_diagnostic.IDE0120.severity = suggestion
+dotnet_diagnostic.IDE0028.severity = suggestion
+dotnet_diagnostic.IDE0045.severity = suggestion
+
+# Code quality rules
+dotnet_diagnostic.CA2254.severity = none # Template should be a static expression
+
+[**/*.cs]
+dotnet_diagnostic.IDE0058.severity = none
 
 # Nullable culture
 dotnet_diagnostic.CS8618.severity = warning # Non-nullable uninitialized
@@ -54,8 +66,8 @@ dotnet_diagnostic.CS1591.severity = none # Missing XML docs
 
 #### Core EditorConfig Options ####
 indent_style = space
-indent_size = 2
-tab_width = 2
+indent_size = 4
+tab_width = 4
 
 #### .NET Code Actions ####
 dotnet_hide_advanced_members = false

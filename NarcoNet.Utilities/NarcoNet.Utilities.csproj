@@ -1,10 +1,31 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
+        <TargetFramework>net472</TargetFramework>
+        <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
     </PropertyGroup>
+
+    <!-- Generate version constant at compile time -->
+    <Target Name="GenerateVersionFile" BeforeTargets="BeforeCompile">
+        <PropertyGroup>
+            <VersionFileContent>
+// Auto-generated file - DO NOT EDIT
+// Update version in Directory.Build.props
+
+namespace NarcoNet.Utilities%3b
+
+public static class NarcoNetVersion
+{
+    public const string Version = "$(VersionPrefix)"%3b
+}
+            </VersionFileContent>
+        </PropertyGroup>
+        <WriteLinesToFile File="$(IntermediateOutputPath)NarcoNetVersion.g.cs" Lines="$(VersionFileContent)" Overwrite="true" />
+        <ItemGroup>
+            <Compile Include="$(IntermediateOutputPath)NarcoNetVersion.g.cs" />
+        </ItemGroup>
+    </Target>
 
     <ItemGroup>
         <Reference Include="UnityEngine">
@@ -216,18 +237,18 @@
         </Reference>
     </ItemGroup>
 
-    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SolutionDir)' != '' AND '$(SolutionDir)' != '*Undefined*'">
         <PropertyGroup>
-            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\MadManBeavis-NarcoNet</BuildOutputDir>
         </PropertyGroup>
 
         <!-- Create output directory structure -->
-        <MakeDir Directories="$(BuildOutputDir)" />
+        <MakeDir Directories="$(BuildOutputDir)"/>
 
         <!-- Copy the Utilities DLL -->
-        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)"/>
 
-        <Message Text="NarcoNet.Utilities copied to: $(BuildOutputDir)" Importance="high" />
+        <Message Text="NarcoNet.Utilities copied to: $(BuildOutputDir)" Importance="high"/>
     </Target>
 
 </Project>

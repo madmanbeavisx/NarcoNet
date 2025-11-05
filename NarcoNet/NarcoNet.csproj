@@ -1,17 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
+        <TargetFramework>net472</TargetFramework>
+        <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
-        <PackageReference Include="SPTarkov.Common" Version="4.0.1"/>
-        <PackageReference Include="SPTarkov.DI" Version="4.0.1"/>
-        <PackageReference Include="SPTarkov.Reflection" Version="4.0.1"/>
-        <PackageReference Include="SPTarkov.Server.Core" Version="4.0.1"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -20,6 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="System.Net.Http"/>
         <Reference Include="Assembly-CSharp">
             <HintPath>..\References\Assembly-CSharp.dll</HintPath>
         </Reference>
@@ -84,20 +81,20 @@
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <PropertyGroup>
-            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\MadManBeavis-NarcoNet</BuildOutputDir>
         </PropertyGroup>
 
         <!-- Create output directory structure -->
-        <MakeDir Directories="$(BuildOutputDir)" />
+        <MakeDir Directories="$(BuildOutputDir)"/>
 
         <!-- Copy only the main NarcoNet.dll (not dependencies) -->
-        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)"/>
 
         <!-- Copy NarcoNet.UI.dll and NarcoNet.Utilities.dll as they are project dependencies -->
-        <Copy SourceFiles="$(OutDir)NarcoNet.UI.dll" DestinationFolder="$(BuildOutputDir)" Condition="Exists('$(OutDir)NarcoNet.UI.dll')" />
-        <Copy SourceFiles="$(OutDir)NarcoNet.Utilities.dll" DestinationFolder="$(BuildOutputDir)" Condition="Exists('$(OutDir)NarcoNet.Utilities.dll')" />
+        <Copy SourceFiles="$(OutDir)NarcoNet.UI.dll" DestinationFolder="$(BuildOutputDir)" Condition="Exists('$(OutDir)NarcoNet.UI.dll')"/>
+        <Copy SourceFiles="$(OutDir)NarcoNet.Utilities.dll" DestinationFolder="$(BuildOutputDir)" Condition="Exists('$(OutDir)NarcoNet.Utilities.dll')"/>
 
-        <Message Text="Build output copied to: $(BuildOutputDir)" Importance="high" />
+        <Message Text="Build output copied to: $(BuildOutputDir)" Importance="high"/>
     </Target>
 
 </Project>

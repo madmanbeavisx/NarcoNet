@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
+        <TargetFramework>net472</TargetFramework>
+        <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
@@ -222,16 +222,16 @@
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <PropertyGroup>
-            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\UrGrannyOnFent-NarcoNet</BuildOutputDir>
+            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\MadManBeavis-NarcoNet</BuildOutputDir>
         </PropertyGroup>
 
         <!-- Create output directory structure -->
-        <MakeDir Directories="$(BuildOutputDir)" />
+        <MakeDir Directories="$(BuildOutputDir)"/>
 
         <!-- Copy the UI DLL -->
-        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)" />
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BuildOutputDir)"/>
 
-        <Message Text="NarcoNet.UI copied to: $(BuildOutputDir)" Importance="high" />
+        <Message Text="NarcoNet.UI copied to: $(BuildOutputDir)" Importance="high"/>
     </Target>
 
 </Project>

@@ -5,173 +5,174 @@ namespace NarcoNet.Updater.Tests.Core;
 
 public class ApplicationConfigurationTests
 {
-  [Fact]
-  public void Constructor_WithValidParameters_CreatesConfiguration()
-  {
-    // Arrange
-    int processId = 1234;
-    bool isSilent = true;
+    [Fact]
+    public void Constructor_WithValidParameters_CreatesConfiguration()
+    {
+        // Arrange
+        int processId = 1234;
+        bool isSilent = true;
 
-    // Act
-    ApplicationConfiguration config = new(processId, isSilent);
+        // Act
+        ApplicationConfiguration config = new(processId, isSilent);
 
-    // Assert
-    config.TargetProcessId.Should().Be(processId);
-    config.IsSilentMode.Should().BeTrue();
-  }
+        // Assert
+        config.TargetProcessId.Should().Be(processId);
+        config.IsSilentMode.Should().BeTrue();
+    }
 
-  [Theory]
-  [InlineData(0)]
-  [InlineData(-1)]
-  [InlineData(-100)]
-  public void Constructor_WithInvalidProcessId_ThrowsArgumentException(int invalidProcessId)
-  {
-    // Act
-    Action act = () => new ApplicationConfiguration(invalidProcessId, false);
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-100)]
+    public void Constructor_WithInvalidProcessId_ThrowsArgumentException(int invalidProcessId)
+    {
+        // Act
+        Action act = () => new ApplicationConfiguration(invalidProcessId, false);
 
-    // Assert
-    act.Should().Throw<ArgumentException>()
-      .WithParameterName("targetProcessId")
-      .WithMessage("*positive*");
-  }
+        // Assert
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("targetProcessId")
+            .WithMessage("*positive*");
+    }
 
-  [Fact]
-  public void TryParseFromArguments_WithValidArguments_ReturnsConfiguration()
-  {
-    // Arrange
-    string[] args = new[] { "1234" };
+    [Fact]
+    public void TryParseFromArguments_WithValidArguments_ReturnsConfiguration()
+    {
+        // Arrange
+        string[] args = ["1234"];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().NotBeNull();
-    config!.TargetProcessId.Should().Be(1234);
-    config.IsSilentMode.Should().BeFalse();
-    error.Should().BeNull();
-  }
+        // Assert
+        config.Should().NotBeNull();
+        config!.TargetProcessId.Should().Be(1234);
+        config.IsSilentMode.Should().BeFalse();
+        error.Should().BeNull();
+    }
 
-  [Fact]
-  public void TryParseFromArguments_WithSilentFlag_SetsSilentMode()
-  {
-    // Arrange
-    string[] args = new[] { "--silent", "5678" };
+    [Fact]
+    public void TryParseFromArguments_WithSilentFlag_SetsSilentMode()
+    {
+        // Arrange
+        string[] args = ["--silent", "5678"];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().NotBeNull();
-    config!.TargetProcessId.Should().Be(5678);
-    config.IsSilentMode.Should().BeTrue();
-    error.Should().BeNull();
-  }
+        // Assert
+        config.Should().NotBeNull();
+        config!.TargetProcessId.Should().Be(5678);
+        config.IsSilentMode.Should().BeTrue();
+        error.Should().BeNull();
+    }
 
-  [Fact]
-  public void TryParseFromArguments_WithEmptyArgs_ReturnsNullWithError()
-  {
-    // Arrange
-    string[] args = Array.Empty<string>();
+    [Fact]
+    public void TryParseFromArguments_WithEmptyArgs_ReturnsNullWithError()
+    {
+        // Arrange
+        string[] args = [
+        ];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().BeNull();
-    error.Should().NotBeNullOrEmpty();
-    error.Should().Contain("No arguments");
-  }
+        // Assert
+        config.Should().BeNull();
+        error.Should().NotBeNullOrEmpty();
+        error.Should().Contain("No arguments");
+    }
 
-  [Fact]
-  public void TryParseFromArguments_WithOnlyFlags_ReturnsNullWithError()
-  {
-    // Arrange
-    string[] args = new[] { "--silent" };
+    [Fact]
+    public void TryParseFromArguments_WithOnlyFlags_ReturnsNullWithError()
+    {
+        // Arrange
+        string[] args = ["--silent"];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().BeNull();
-    error.Should().NotBeNullOrEmpty();
-    error.Should().Contain("Missing required process ID");
-  }
+        // Assert
+        config.Should().BeNull();
+        error.Should().NotBeNullOrEmpty();
+        error.Should().Contain("Missing required process ID");
+    }
 
-  [Theory]
-  [InlineData("abc")]
-  [InlineData("12.34")]
-  [InlineData("")]
-  public void TryParseFromArguments_WithInvalidProcessId_ReturnsNullWithError(string invalidPid)
-  {
-    // Arrange
-    string[] args = new[] { invalidPid };
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("12.34")]
+    [InlineData("")]
+    public void TryParseFromArguments_WithInvalidProcessId_ReturnsNullWithError(string invalidPid)
+    {
+        // Arrange
+        string[] args = [invalidPid];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().BeNull();
-    error.Should().NotBeNullOrEmpty();
-    error.Should().Contain("Invalid process ID");
-  }
+        // Assert
+        config.Should().BeNull();
+        error.Should().NotBeNullOrEmpty();
+        error.Should().Contain("Invalid process ID");
+    }
 
-  [Theory]
-  [InlineData("0")]
-  [InlineData("-1")]
-  public void TryParseFromArguments_WithZeroOrNegativeProcessId_ReturnsNullWithError(string processId)
-  {
-    // Arrange
-    string[] args = new[] { processId };
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    public void TryParseFromArguments_WithZeroOrNegativeProcessId_ReturnsNullWithError(string processId)
+    {
+        // Arrange
+        string[] args = [processId];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().BeNull();
-    error.Should().NotBeNullOrEmpty();
-    error.Should().Contain("Must be a positive integer");
-  }
+        // Assert
+        config.Should().BeNull();
+        error.Should().NotBeNullOrEmpty();
+        error.Should().Contain("Must be a positive integer");
+    }
 
-  [Fact]
-  public void TryParseFromArguments_WithMultiplePositionalArgs_UsesLastOne()
-  {
-    // Arrange
-    string[] args = new[] { "1111", "2222", "3333" };
+    [Fact]
+    public void TryParseFromArguments_WithMultiplePositionalArgs_UsesLastOne()
+    {
+        // Arrange
+        string[] args = ["1111", "2222", "3333"];
 
-    // Act
-    ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
+        // Act
+        ApplicationConfiguration? config = ApplicationConfiguration.TryParseFromArguments(args, out string? error);
 
-    // Assert
-    config.Should().NotBeNull();
-    config!.TargetProcessId.Should().Be(3333);
-  }
+        // Assert
+        config.Should().NotBeNull();
+        config!.TargetProcessId.Should().Be(3333);
+    }
 
-  [Fact]
-  public void ToString_ReturnsFormattedString()
-  {
-    // Arrange
-    ApplicationConfiguration config = new(1234, true);
+    [Fact]
+    public void ToString_ReturnsFormattedString()
+    {
+        // Arrange
+        ApplicationConfiguration config = new(1234, true);
 
-    // Act
-    string result = config.ToString();
+        // Act
+        string result = config.ToString();
 
-    // Assert
-    result.Should().Contain("1234");
-    result.Should().Contain("ProcessId");
-    result.Should().Contain("SilentMode");
-    result.Should().Contain("True");
-  }
+        // Assert
+        result.Should().Contain("1234");
+        result.Should().Contain("ProcessId");
+        result.Should().Contain("SilentMode");
+        result.Should().Contain("True");
+    }
 
-  [Fact]
-  public void UsageMessage_ContainsRequiredInformation()
-  {
-    // Act
-    string message = ApplicationConfiguration.UsageMessage;
+    [Fact]
+    public void UsageMessage_ContainsRequiredInformation()
+    {
+        // Act
+        string message = ApplicationConfiguration.UsageMessage;
 
-    // Assert
-    message.Should().Contain("Usage:");
-    message.Should().Contain("Process ID");
-    message.Should().Contain("--silent");
-    message.Should().Contain(NarcoNetConstants.UpdaterExecutableName);
-  }
+        // Assert
+        message.Should().Contain("Usage:");
+        message.Should().Contain("Process ID");
+        message.Should().Contain("--silent");
+        message.Should().Contain(NarcoNetConstants.UpdaterExecutableName);
+    }
 }

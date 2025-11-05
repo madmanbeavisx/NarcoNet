@@ -26,6 +26,12 @@
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 
+    <!-- Documentation -->
+    <PropertyGroup>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn> <!-- Missing XML comment for publicly visible type or member -->
+    </PropertyGroup>
+
     <!-- Build Output -->
     <PropertyGroup>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

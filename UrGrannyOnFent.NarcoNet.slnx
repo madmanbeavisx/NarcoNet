@@ -1,12 +1,14 @@
 <Solution>
-    <Folder Name="/Solution Items/">
-        <File Path=".editorconfig"/>
-        <File Path=".gitignore"/>
-        <File Path=".gitattributes"/>
-    </Folder>
-    <Project Path="NarcoNet.Utilities\NarcoNet.Utilities.csproj"/>
-    <Project Path="NarcoNet.UI\NarcoNet.UI.csproj" Type="Classic C#"/>
-    <Project Path="NarcoNet.Updater.Tests\NarcoNet.Updater.Tests.csproj" Type="Classic C#"/>
-    <Project Path="NarcoNet.Updater\NarcoNet.Updater.csproj" Type="Classic C#"/>
-    <Project Path="NarcoNet/NarcoNet.csproj"/>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path=".gitattributes" />
+    <File Path="test-endpoints.ps1" />
+  </Folder>
+  <Project Path="NarcoNet.Server\NarcoNet.Server.csproj" Type="Classic C#" />
+  <Project Path="NarcoNet.UI\NarcoNet.UI.csproj" Type="Classic C#" />
+  <Project Path="NarcoNet.Updater.Tests\NarcoNet.Updater.Tests.csproj" Type="Classic C#" />
+  <Project Path="NarcoNet.Updater\NarcoNet.Updater.csproj" Type="Classic C#" />
+  <Project Path="NarcoNet.Utilities\NarcoNet.Utilities.csproj" />
+  <Project Path="NarcoNet/NarcoNet.csproj" />
 </Solution>

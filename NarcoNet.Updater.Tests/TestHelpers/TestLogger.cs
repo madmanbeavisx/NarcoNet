@@ -3,81 +3,83 @@ using NarcoNet.Updater.Interfaces;
 namespace NarcoNet.Updater.Tests.TestHelpers;
 
 /// <summary>
-///   In-memory logger for testing that captures all log entries.
+///     In-memory logger for testing that captures all log entries.
 /// </summary>
 public class TestLogger : ILogger
 {
-  private readonly object _lock = new();
-  private readonly List<LogEntry> _logEntries = new();
+    private readonly object _lock = new();
+    private readonly List<LogEntry> _logEntries =
+    [
+    ];
 
-  public IReadOnlyList<LogEntry> LogEntries
-  {
-    get
+    public IReadOnlyList<LogEntry> LogEntries
     {
-      lock (_lock)
-      {
-        return _logEntries.ToList();
-      }
+        get
+        {
+            lock (_lock)
+            {
+                return _logEntries.ToList();
+            }
+        }
     }
-  }
 
-  public void LogInformation(string message)
-  {
-    AddLogEntry(LogLevel.Information, message);
-  }
-
-  public void LogWarning(string message)
-  {
-    AddLogEntry(LogLevel.Warning, message);
-  }
-
-  public void LogError(string message)
-  {
-    AddLogEntry(LogLevel.Error, message);
-  }
-
-  public void LogException(Exception exception, string? message = null)
-  {
-    AddLogEntry(LogLevel.Error, message ?? exception.Message, exception);
-  }
-
-  private void AddLogEntry(LogLevel level, string message, Exception? exception = null)
-  {
-    lock (_lock)
+    public void LogInformation(string message)
     {
-      _logEntries.Add(new LogEntry(level, message, exception, DateTime.UtcNow));
+        AddLogEntry(LogLevel.Information, message);
     }
-  }
 
-  public void Clear()
-  {
-    lock (_lock)
+    public void LogWarning(string message)
     {
-      _logEntries.Clear();
+        AddLogEntry(LogLevel.Warning, message);
     }
-  }
 
-  public bool HasLogLevel(LogLevel level)
-  {
-    return _logEntries.Any(e => e.Level == level);
-  }
+    public void LogError(string message)
+    {
+        AddLogEntry(LogLevel.Error, message);
+    }
 
-  public bool ContainsMessage(string substring)
-  {
-    return _logEntries.Any(e => e.Message.Contains(substring, StringComparison.OrdinalIgnoreCase));
-  }
+    public void LogException(Exception exception, string? message = null)
+    {
+        AddLogEntry(LogLevel.Error, message ?? exception.Message, exception);
+    }
 
-  public int GetLogCount(LogLevel level)
-  {
-    return _logEntries.Count(e => e.Level == level);
-  }
+    private void AddLogEntry(LogLevel level, string message, Exception? exception = null)
+    {
+        lock (_lock)
+        {
+            _logEntries.Add(new LogEntry(level, message, exception, DateTime.UtcNow));
+        }
+    }
+
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _logEntries.Clear();
+        }
+    }
+
+    public bool HasLogLevel(LogLevel level)
+    {
+        return _logEntries.Any(e => e.Level == level);
+    }
+
+    public bool ContainsMessage(string substring)
+    {
+        return _logEntries.Any(e => e.Message.IndexOf(substring, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    public int GetLogCount(LogLevel level)
+    {
+        return _logEntries.Count(e => e.Level == level);
+    }
 }
 
 public enum LogLevel
 {
-  Information,
-  Warning,
-  Error
+    Information,
+    Warning,
+    Error
 }
 
 public record LogEntry(LogLevel Level, string Message, Exception? Exception, DateTime Timestamp);

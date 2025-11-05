@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+        <!-- Output to SPT mods folder -->
+        <OutputPath>$(SolutionDir)Build\SPT\user\mods\NarcoNet-Server\</OutputPath>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+        <!-- Don't generate XML documentation for this project -->
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+        <!-- Don't generate debug symbols or deps.json -->
+        <DebugType>none</DebugType>
+        <DebugSymbols>false</DebugSymbols>
+        <GenerateDependencyFile>false</GenerateDependencyFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="SPTarkov.Common" Version="4.0.3">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </PackageReference>
+        <PackageReference Include="SPTarkov.DI" Version="4.0.3">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </PackageReference>
+        <PackageReference Include="SPTarkov.Reflection" Version="4.0.3">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </PackageReference>
+        <PackageReference Include="SPTarkov.Server.Core" Version="4.0.3">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </PackageReference>
+        <PackageReference Include="SPTarkov.Server.Web" Version="4.0.3">
+            <PrivateAssets>all</PrivateAssets>
+            <ExcludeAssets>runtime</ExcludeAssets>
+        </PackageReference>
+        <PackageReference Include="YamlDotNet" Version="16.2.1">
+            <PrivateAssets>none</PrivateAssets>
+        </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NarcoNet.Utilities\NarcoNet.Utilities.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="package.json" CopyToOutputDirectory="Always" />
+    </ItemGroup>
+
+</Project>
