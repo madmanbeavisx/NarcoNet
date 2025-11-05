@@ -7,7 +7,10 @@ using SPT.Common.Utils;
 
 namespace NarcoNet;
 
-internal class ServerModule(Version pluginVersion)
+/// <summary>
+///     Handles communication with the NarcoNet server
+/// </summary>
+public class ServerModule(Version pluginVersion)
 {
     private async Task<string> GetJsonTask(string jsonPath)
     {
