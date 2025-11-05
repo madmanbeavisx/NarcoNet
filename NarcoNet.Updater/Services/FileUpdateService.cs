@@ -454,7 +454,8 @@ public class FileUpdateService : IFileUpdateService
             throw new InvalidOperationException("DeleteFile operation requires Destination");
         }
 
-        await DeleteSingleFileAsync(operation.Destination, cancellationToken);
+        if (operation.Destination != null)
+            await DeleteSingleFileAsync(operation.Destination, cancellationToken);
     }
 
     /// <summary>

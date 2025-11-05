@@ -336,7 +336,9 @@ public class TelemetryTests
             }));
         }
 
+#pragma warning disable xUnit1031
         Task.WaitAll(tasks.ToArray());
+#pragma warning restore xUnit1031
         TelemetrySummary summary = telemetry.GetSummary();
 
         // Assert
