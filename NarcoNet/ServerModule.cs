@@ -21,7 +21,7 @@ internal class ServerModule(Version pluginVersion)
         }
         catch (Exception e)
         {
-            NarcoPlugin.Logger.LogError($"💥 Communication with headquarters failed for {jsonPath}: {e.Message}");
+            NarcoPlugin.Logger.LogError($"Request failed for {jsonPath}: {e.Message}");
             throw;
         }
     }
@@ -76,12 +76,12 @@ internal class ServerModule(Version pluginVersion)
                 {
                     case >= 1 and <= 5:
                         int retryTime = 2 * retryCount;
-                        NarcoPlugin.Logger.LogError(
-                            $"📦 Package '{file}' got intercepted! Sending another courier in {retryTime} seconds. Attempt #{retryCount}/5 ...");
+                        NarcoPlugin.Logger.LogDebug(
+                            $"Download failed for '{file}', retrying in {retryTime} seconds (Attempt {retryCount}/5)");
                         break;
                     case > 5:
                         NarcoPlugin.Logger.LogError(
-                            $"💀 Lost package '{file}' after {retryCount} attempts. The route is too hot, we need to lay low: {e}"
+                            $"Download failed for '{file}' after {retryCount} attempts: {e}"
                         );
                         throw;
                 }
@@ -108,7 +108,7 @@ internal class ServerModule(Version pluginVersion)
     {
         if (paths == null || paths.Count == 0)
         {
-            NarcoPlugin.Logger.LogWarning("⚠️ No smuggling routes provided to check inventory!");
+            NarcoPlugin.Logger.LogWarning("No sync paths provided");
             return new Dictionary<string, Dictionary<string, string>>();
         }
 
@@ -127,7 +127,7 @@ internal class ServerModule(Version pluginVersion)
         }
         catch (Exception e)
         {
-            NarcoPlugin.Logger.LogError($"💥 Failed to get the boss's inventory: {e.Message}");
+            NarcoPlugin.Logger.LogError($"Failed to get remote hashes: {e.Message}");
             throw;
         }
     }

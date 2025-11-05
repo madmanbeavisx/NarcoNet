@@ -61,9 +61,9 @@ public sealed class ApplicationCoordinator
     {
         try
         {
-            _logger.LogInformation($"🔧 Starting {NarcoNetConstants.FullProductName} cleanup crew");
-            _logger.LogInformation($"🎭 Operation mode: {(_configuration.IsSilentMode ? "Silent (Ghost Protocol)" : "Visible (Standard Operation)")}");
-            _logger.LogInformation($"🎯 Target witness ID: {_configuration.TargetProcessId}");
+            _logger.LogInformation($"Starting {NarcoNetConstants.FullProductName} updater");
+            _logger.LogDebug($"Mode: {(_configuration.IsSilentMode ? "Silent" : "GUI")}");
+            _logger.LogDebug($"Target process ID: {_configuration.TargetProcessId}");
 
             if (!ValidateExecutionEnvironment())
             {
@@ -72,7 +72,7 @@ public sealed class ApplicationCoordinator
 
             if (!_fileUpdateService.HasPendingUpdates())
             {
-                _logger.LogInformation("📭 No packages to move. The shipment is clean. Standing down.");
+                _logger.LogDebug("No pending updates found.");
                 return ExitCode.Success;
             }
 
@@ -85,7 +85,7 @@ public sealed class ApplicationCoordinator
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💀 Operation went sideways! The crew is compromised!");
+            _logger.LogException(ex, "Fatal error in updater");
             return ExitCode.UnexpectedError;
         }
     }
@@ -99,7 +99,7 @@ public sealed class ApplicationCoordinator
         // Make sure we're in the right neighborhood
         if (!File.Exists(Path.Combine(Directory.GetCurrentDirectory(), "EscapeFromTarkov.exe")))
         {
-            _logger.LogError("💥 Can't find the target location! This isn't the right territory, compadre!");
+            _logger.LogError("EscapeFromTarkov.exe not found in current directory");
 
             if (!_configuration.IsSilentMode)
             {
@@ -120,7 +120,7 @@ public sealed class ApplicationCoordinator
 
         if (!Directory.Exists(dataDirectory))
         {
-            _logger.LogError("💥 The stash house is missing! Someone cleaned out the warehouse!");
+            _logger.LogError("Staging directory does not exist");
 
             if (!_configuration.IsSilentMode)
             {
@@ -133,7 +133,7 @@ public sealed class ApplicationCoordinator
             return false;
         }
 
-        _logger.LogInformation("✅ Territory secured. The coast is clear, let's move!");
+        _logger.LogDebug("Environment validation completed");
         return true;
     }
 
@@ -151,19 +151,19 @@ public sealed class ApplicationCoordinator
             WaitForProcessExitSynchronously();
 
             // Move the packages into position
-            _logger.LogInformation("📦 Moving the merchandise into position...");
+            _logger.LogDebug("Applying pending updates...");
             _fileUpdateService.ApplyPendingUpdatesAsync(CancellationToken.None).Wait();
 
             // Execute the hit list
-            _logger.LogInformation("🗑️ Disposing of the evidence...");
+            _logger.LogDebug("Deleting removed files...");
             _fileUpdateService.DeleteRemovedFilesAsync(CancellationToken.None).Wait();
 
-            _logger.LogInformation("✅ Job's done, patron. The package is delivered!");
+            _logger.LogInformation("Update completed successfully");
             return ExitCode.Success;
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💥 Silent op went loud! We got made!");
+            _logger.LogException(ex, "Silent update failed");
             return ExitCode.UpdateFailed;
         }
     }
@@ -176,7 +176,7 @@ public sealed class ApplicationCoordinator
     {
         try
         {
-            _logger.LogInformation("🎬 Running the operation in full view...");
+            _logger.LogDebug("Running in GUI mode...");
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -187,7 +187,7 @@ public sealed class ApplicationCoordinator
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💥 The operation fell apart! Too many witnesses!");
+            _logger.LogException(ex, "GUI update failed");
             return ExitCode.UpdateFailed;
         }
     }
@@ -202,11 +202,11 @@ public sealed class ApplicationCoordinator
         while (_processMonitor.IsProcessRunning(_configuration.TargetProcessId))
         {
             iterationCount++;
-            _logger.LogInformation($"⏳ Waiting for the witness to leave the scene (check #{iterationCount})...");
+            _logger.LogDebug($"Waiting for target process to exit (check #{iterationCount})...");
             Thread.Sleep(1000);
         }
 
-        _logger.LogInformation("👻 The witness has left. Moving in now!");
+        _logger.LogDebug("Target process exited, proceeding with update");
     }
 
     /// <summary>

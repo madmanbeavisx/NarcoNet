@@ -59,12 +59,12 @@ public class FileUpdateService : IFileUpdateService
     {
         if (!HasPendingUpdates())
         {
-            _logger.LogInformation("📭 No merchandise in the staging area.");
+            _logger.LogDebug("No pending updates in staging directory.");
             return;
         }
 
         List<string> filesToUpdate = GetPendingUpdateFiles().ToList();
-        _logger.LogInformation($"📦 Got {filesToUpdate.Count} packages ready to move.");
+        _logger.LogDebug($"Found {filesToUpdate.Count} files to update.");
 
         foreach (string relativeFilePath in filesToUpdate)
         {
@@ -81,7 +81,7 @@ public class FileUpdateService : IFileUpdateService
     {
         if (!File.Exists(_removedFilesManifestPath))
         {
-            _logger.LogInformation("📋 No hit list found. Nothing to dispose of.");
+            _logger.LogDebug("No removed files manifest found.");
             return;
         }
 
@@ -89,12 +89,12 @@ public class FileUpdateService : IFileUpdateService
 
         if (removedFiles == null || removedFiles.Count == 0)
         {
-            _logger.LogInformation("✅ Hit list is empty. Clean slate!");
+            _logger.LogDebug("Removed files list is empty.");
             await DeleteManifestFileAsync(cancellationToken);
             return;
         }
 
-        _logger.LogInformation($"🗑️ Got {removedFiles.Count} targets on the hit list.");
+        _logger.LogDebug($"Deleting {removedFiles.Count} removed files.");
 
         foreach (string relativeFilePath in removedFiles)
         {
@@ -139,7 +139,7 @@ public class FileUpdateService : IFileUpdateService
             string sourceFilePath = Path.Combine(_updateStagingDirectory, relativeFilePath);
             string targetFilePath = Path.Combine(_targetDirectory, relativeFilePath);
 
-            _logger.LogInformation($"📦 Moving package: {relativeFilePath}");
+            _logger.LogDebug($"Updating file: {relativeFilePath}");
 
             // Make sure the drop location exists
             string? targetDirectoryPath = Path.GetDirectoryName(targetFilePath);
@@ -151,11 +151,11 @@ public class FileUpdateService : IFileUpdateService
             // Drop the package at the location
             await Task.Run(() => File.Copy(sourceFilePath, targetFilePath, true), cancellationToken);
 
-            _logger.LogInformation($"✅ Package delivered: {relativeFilePath}");
+            _logger.LogDebug($"File updated: {relativeFilePath}");
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, $"💥 Package drop failed: {relativeFilePath}");
+            _logger.LogException(ex, $"Failed to update file: {relativeFilePath}");
             throw;
         }
     }
@@ -173,22 +173,22 @@ public class FileUpdateService : IFileUpdateService
 
             if (!File.Exists(targetFilePath))
             {
-                _logger.LogWarning($"⚠️ Target already gone: {relativeFilePath}");
+                _logger.LogWarning($"File already removed: {relativeFilePath}");
                 return;
             }
 
-            _logger.LogInformation($"🗑️ Eliminating target: {relativeFilePath}");
+            _logger.LogDebug($"Deleting file: {relativeFilePath}");
 
             await Task.Run(() => File.Delete(targetFilePath), cancellationToken);
 
-            _logger.LogInformation($"✅ Target eliminated: {relativeFilePath}");
+            _logger.LogDebug($"File deleted: {relativeFilePath}");
 
             // Clean up empty safe houses
             await CleanupEmptyParentDirectoriesAsync(targetFilePath, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, $"💥 Hit failed on target: {relativeFilePath}");
+            _logger.LogException(ex, $"Failed to delete file: {relativeFilePath}");
             // Don't abort the whole operation - move on to the next target
         }
     }
@@ -222,7 +222,7 @@ public class FileUpdateService : IFileUpdateService
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💥 Can't read the hit list!");
+            _logger.LogException(ex, "Failed to read removed files manifest");
             throw;
         }
     }
@@ -234,15 +234,15 @@ public class FileUpdateService : IFileUpdateService
     {
         try
         {
-            _logger.LogInformation($"🧹 Cleaning the staging area: {_updateStagingDirectory}");
+            _logger.LogDebug($"Cleaning staging directory: {_updateStagingDirectory}");
 
             await Task.Run(() => Directory.Delete(_updateStagingDirectory, true), cancellationToken);
 
-            _logger.LogInformation("✅ Staging area is spotless!");
+            _logger.LogDebug("Staging directory cleaned up");
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💥 Couldn't clean the staging area!");
+            _logger.LogException(ex, "Failed to clean staging directory");
             // Not a big deal - keep moving
         }
     }
@@ -254,15 +254,15 @@ public class FileUpdateService : IFileUpdateService
     {
         try
         {
-            _logger.LogInformation($"🔥 Burning the hit list: {_removedFilesManifestPath}");
+            _logger.LogDebug($"Deleting removed files manifest: {_removedFilesManifestPath}");
 
             await Task.Run(() => File.Delete(_removedFilesManifestPath), cancellationToken);
 
-            _logger.LogInformation("✅ Hit list destroyed. No evidence!");
+            _logger.LogDebug("Removed files manifest deleted");
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💥 Couldn't burn the hit list!");
+            _logger.LogException(ex, "Failed to delete removed files manifest");
             // Not a big deal - keep moving
         }
     }
@@ -292,13 +292,13 @@ public class FileUpdateService : IFileUpdateService
 
             if (!hasFiles)
             {
-                _logger.LogInformation($"🧹 Cleaning empty safe house: {parentDirectory}");
+                _logger.LogDebug($"Deleting empty directory: {parentDirectory}");
                 await Task.Run(() => Directory.Delete(parentDirectory), cancellationToken);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💥 Couldn't clean empty safe houses!");
+            _logger.LogException(ex, "Failed to clean empty directories");
             // Not a big deal - keep moving
         }
     }

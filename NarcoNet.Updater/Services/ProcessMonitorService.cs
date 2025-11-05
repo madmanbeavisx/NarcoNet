@@ -36,7 +36,7 @@ public class ProcessMonitorService : IProcessMonitor
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, $"💥 Can't track witness {processId}");
+            _logger.LogException(ex, $"Failed to check process {processId}");
             return false;
         }
     }
@@ -47,7 +47,7 @@ public class ProcessMonitorService : IProcessMonitor
         CancellationToken cancellationToken,
         Action<int>? progressCallback = null)
     {
-        _logger.LogInformation($"⏳ Watching for witness {processId} to leave the scene...");
+        _logger.LogDebug($"Waiting for process {processId} to exit...");
 
         int iterationCount = 0;
 
@@ -55,12 +55,12 @@ public class ProcessMonitorService : IProcessMonitor
         {
             if (!IsProcessRunning(processId))
             {
-                _logger.LogInformation($"👻 Witness {processId} has left the building!");
+                _logger.LogDebug($"Process {processId} has exited");
                 break;
             }
 
             iterationCount++;
-            _logger.LogInformation($"⏰ Witness {processId} still around (waited {iterationCount} seconds)");
+            _logger.LogDebug($"Process {processId} still running (waited {iterationCount} seconds)");
 
             progressCallback?.Invoke(iterationCount);
 
@@ -70,14 +70,14 @@ public class ProcessMonitorService : IProcessMonitor
             }
             catch (TaskCanceledException)
             {
-                _logger.LogWarning($"⚠️ Surveillance on witness {processId} was aborted!");
+                _logger.LogWarning($"Process monitoring for {processId} was cancelled");
                 throw;
             }
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning($"⚠️ Pulled the lookout before witness {processId} left. Operation incomplete!");
+            _logger.LogWarning($"Process monitoring for {processId} was cancelled before exit");
         }
     }
 }

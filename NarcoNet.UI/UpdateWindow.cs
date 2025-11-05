@@ -44,33 +44,32 @@ public class UpdateWindow(
 
 internal class UpdateBox(string title, string message, string continueText, string cancelText) : Bordered
 {
-    private const int BorderThickness = 2;
-    private const int CornerRadius = 12;
+    private const int BorderThickness = 3;
+    private const int CornerRadius = 16;
 
     private readonly UpdateButton _acceptButton = new(continueText, Colors.Primary, Colors.PrimaryLight,
-        Colors.PrimaryDark, Colors.PrimaryLight);
+        Colors.PrimaryDark);
 
     private readonly UpdateButton _declineButton = new(
         cancelText,
         Colors.Secondary,
         Colors.SecondaryLight,
         Colors.SecondaryDark,
-        Colors.SecondaryLight,
         "Enforced updates will still be downloaded."
     );
 
     private readonly UpdateButtonTooltip _updateButtonTooltip = new();
     private Vector2 _scrollPosition = Vector2.zero;
 
-    public void Draw(Vector2 size, string updatesText, Action onAccept, Action onDecline)
+    public void Draw(Vector2 size, string updatesText, Action? onAccept, Action? onDecline)
     {
         Rect borderRect = GUILayoutUtility.GetRect(size.x, size.y);
 
-        // Draw shadow for depth
-        Utility.DrawShadow(borderRect, 0, 6, 12);
+        // Draw stronger shadow for more depth
+        Utility.DrawShadow(borderRect, 0, 12, 24);
 
-        // Draw rounded border
-        DrawBorder(borderRect, BorderThickness, Colors.PrimaryLight, CornerRadius);
+        // Draw a glowing border effect
+        DrawBorder(borderRect, BorderThickness, Colors.Primary.SetAlpha(0.8f), CornerRadius);
 
         Rect alertRect = new(
             borderRect.x + BorderThickness,
@@ -79,18 +78,18 @@ internal class UpdateBox(string title, string message, string continueText, stri
             borderRect.height - 2 * BorderThickness
         );
 
-        // Draw modern gradient background
-        DrawGradientBox(alertRect, Colors.Dark.SetAlpha(0.85f), Colors.DarkMedium.SetAlpha(0.75f), false,
+        // Draw a modern gradient background with better opacity
+        DrawGradientBox(alertRect, Colors.Dark.SetAlpha(0.95f), Colors.DarkMedium.SetAlpha(0.92f), false,
             CornerRadius - BorderThickness);
 
-        Rect infoRect = new(alertRect.x, alertRect.y, alertRect.width, 96f);
-        Rect scrollRect = new(alertRect.x, alertRect.y + 96f, alertRect.width, alertRect.height - 96f - 48f);
-        Rect actionsRect = new(alertRect.x, alertRect.y + alertRect.height - 48f, alertRect.width, 48f);
+        Rect infoRect = new(alertRect.x, alertRect.y + 24f, alertRect.width, 120f);
+        Rect scrollRect = new(alertRect.x + 16f, alertRect.y + 160f, alertRect.width - 32f, alertRect.height - 160f - 72f);
+        Rect actionsRect = new(alertRect.x, alertRect.y + alertRect.height - 64f, alertRect.width, 64f);
 
         GUIStyle titleStyle = new()
         {
             alignment = TextAnchor.LowerCenter,
-            fontSize = 32,
+            fontSize = 38,
             fontStyle = FontStyle.Bold,
             normal = { textColor = Colors.White }
         };
@@ -98,14 +97,14 @@ internal class UpdateBox(string title, string message, string continueText, stri
         GUIStyle messageStyle = new()
         {
             alignment = TextAnchor.MiddleCenter,
-            fontSize = 18,
+            fontSize = 20,
             normal = { textColor = Colors.OffWhite }
         };
 
         GUIStyle scrollStyle = new()
         {
             alignment = TextAnchor.UpperLeft,
-            fontSize = 16,
+            fontSize = 18,
             normal = { textColor = Colors.OffWhite }
         };
 
@@ -117,21 +116,23 @@ internal class UpdateBox(string title, string message, string continueText, stri
 
         GUIStyle scrollbarStyle = new(GUI.skin.verticalScrollbar)
         {
-            normal = { background = Utility.GetTexture(Colors.Grey.SetAlpha(0.2f)) },
-            active = { background = Utility.GetTexture(Colors.Grey.SetAlpha(0.2f)) },
-            hover = { background = Utility.GetTexture(Colors.Grey.SetAlpha(0.2f)) },
-            focused = { background = Utility.GetTexture(Colors.Grey.SetAlpha(0.2f)) }
+            normal = { background = Utility.GetTexture(Colors.GreyDark.SetAlpha(0.3f)) },
+            active = { background = Utility.GetTexture(Colors.GreyDark.SetAlpha(0.3f)) },
+            hover = { background = Utility.GetTexture(Colors.GreyDark.SetAlpha(0.3f)) },
+            focused = { background = Utility.GetTexture(Colors.GreyDark.SetAlpha(0.3f)) }
         };
         GUIStyle scrollbarThumbStyle = new(GUI.skin.verticalScrollbarThumb)
         {
-            normal = { background = Utility.GetTexture(Colors.Primary.SetAlpha(0.66f)) },
-            active = { background = Utility.GetTexture(Colors.Primary.SetAlpha(0.5f)) },
-            hover = { background = Utility.GetTexture(Colors.Primary.SetAlpha(0.66f)) },
-            focused = { background = Utility.GetTexture(Colors.Primary.SetAlpha(0.5f)) }
+            normal = { background = Utility.GetTexture(Colors.Primary.SetAlpha(0.75f)) },
+            active = { background = Utility.GetTexture(Colors.PrimaryDark.SetAlpha(0.85f)) },
+            hover = { background = Utility.GetTexture(Colors.PrimaryLight.SetAlpha(0.85f)) },
+            focused = { background = Utility.GetTexture(Colors.PrimaryDark.SetAlpha(0.85f)) }
         };
 
-        float scrollHeight = scrollStyle.CalcHeight(new GUIContent(updatesText), alertRect.width - 40f);
-        GUI.DrawTexture(scrollRect, Utility.GetTexture(Color.black.SetAlpha(0.5f)), ScaleMode.StretchToFill, true, 0);
+        float scrollHeight = scrollStyle.CalcHeight(new GUIContent(updatesText), alertRect.width - 72f);
+
+        // Draw scroll area background with a subtle border
+        GUI.DrawTexture(scrollRect, Utility.GetTexture(Color.black.SetAlpha(0.6f)), ScaleMode.StretchToFill, true, 0);
 
         GUISkin oldSkin = GUI.skin;
         GUI.skin.verticalScrollbarThumb = scrollbarThumbStyle;
@@ -146,11 +147,19 @@ internal class UpdateBox(string title, string message, string continueText, stri
             scrollbarStyle
         );
         GUI.skin = oldSkin;
-        GUI.Label(new Rect(16f, 16f, alertRect.width - 56f, scrollHeight), updatesText, scrollStyle);
+        GUI.Label(new Rect(20f, 20f, alertRect.width - 88f, scrollHeight), updatesText, scrollStyle);
         GUI.EndScrollView();
 
+        // Add padding between buttons
+        float buttonPadding = 12f;
+        float buttonMargin = 16f;
+
         if (onDecline != null &&
-            _declineButton.Draw(new Rect(actionsRect.x, actionsRect.y, actionsRect.width / 2, actionsRect.height)))
+            _declineButton.Draw(new Rect(
+                actionsRect.x + buttonMargin,
+                actionsRect.y + 8f,
+                (actionsRect.width - buttonPadding - 2 * buttonMargin) / 2,
+                actionsRect.height - 16f)))
         {
             onDecline();
         }
@@ -159,10 +168,10 @@ internal class UpdateBox(string title, string message, string continueText, stri
             onAccept != null
             && _acceptButton.Draw(
                 new Rect(
-                    actionsRect.x + (onDecline == null ? 0 : actionsRect.width / 2),
-                    actionsRect.y,
-                    onDecline == null ? actionsRect.width : actionsRect.width / 2,
-                    actionsRect.height
+                    actionsRect.x + (onDecline == null ? buttonMargin : (actionsRect.width + buttonPadding) / 2),
+                    actionsRect.y + 8f,
+                    onDecline == null ? actionsRect.width - 2 * buttonMargin : (actionsRect.width - buttonPadding - 2 * buttonMargin) / 2,
+                    actionsRect.height - 16f
                 )
             )
         )
@@ -180,28 +189,21 @@ internal class UpdateButton(
     Color normalColor,
     Color hoverColor,
     Color activeColor,
-    Color borderColor,
     string? tooltip = null) : Bordered
 {
-    private const int BorderThickness = 2;
-    private const int CornerRadius = 6;
+    private const int CornerRadius = 10;
     private bool _active;
     private float _hoverTransition;
 
     public bool Draw(Rect borderRect)
     {
-        Rect buttonRect = new(
-            borderRect.x + BorderThickness,
-            borderRect.y + BorderThickness,
-            borderRect.width - 2 * BorderThickness,
-            borderRect.height - 2 * BorderThickness
-        );
+        Rect buttonRect = borderRect;
 
         bool hovered = buttonRect.Contains(Event.current.mousePosition);
 
         // Smooth hover transition
         float targetTransition = hovered ? 1f : 0f;
-        _hoverTransition = Mathf.Lerp(_hoverTransition, targetTransition, Time.deltaTime * 10f);
+        _hoverTransition = Mathf.Lerp(_hoverTransition, targetTransition, Time.deltaTime * 12f);
 
         if (hovered && Event.current.type == EventType.MouseDown)
         {
@@ -214,44 +216,51 @@ internal class UpdateButton(
         }
 
         // Modern color selection with smooth transitions
-        Color buttonColor;
-        if (_active)
-        {
-            buttonColor = activeColor;
-        }
-        else
-        {
-            buttonColor = Color.Lerp(normalColor, hoverColor, _hoverTransition);
-        }
+        Color buttonColor = _active ? activeColor : Color.Lerp(normalColor, hoverColor, _hoverTransition);
 
         Color textColor = Colors.White;
 
-        // Draw subtle shadow
+        // Draw modern shadow with elevation
+        int shadowOffset = _active ? 2 : 6;
+        int shadowBlur = _active ? 8 : 16;
+        Utility.DrawShadow(borderRect, 0, shadowOffset, shadowBlur);
+
+        // Draw sleek rounded button background with subtle gradient
+        DrawGradientBox(buttonRect, buttonColor, buttonColor.SetAlpha(buttonColor.a * 0.9f), false, CornerRadius);
+
+        // Add highlight effect at top for depth
         if (!_active)
         {
-            Utility.DrawShadow(borderRect, 0, _active ? 1 : 2, _active ? 3 : 5);
-        }
-
-        // Draw rounded border
-        DrawBorder(borderRect, BorderThickness, borderColor, CornerRadius);
-
-        // Draw gradient button background
-        DrawGradientBox(buttonRect, buttonColor, buttonColor.SetAlpha(buttonColor.a * 0.85f), false,
-            CornerRadius - BorderThickness);
-
-        // Add highlight effect at top
-        if (!_active)
-        {
-            Rect highlightRect = new(buttonRect.x, buttonRect.y, buttonRect.width, buttonRect.height * 0.4f);
+            Rect highlightRect = new(buttonRect.x + 4, buttonRect.y + 4, buttonRect.width - 8, buttonRect.height * 0.3f);
             GUI.DrawTexture(highlightRect, Utility.GetTexture(Colors.Highlight), ScaleMode.StretchToFill, true);
         }
+
+        // Add a glow effect on hover
+        if (!(_hoverTransition > 0.1f))
+            return GUI.Button(
+                buttonRect,
+                new GUIContent(text, tooltip),
+                new GUIStyle
+                {
+                    fontSize = 22,
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal =
+                    {
+                        textColor = textColor
+                    }
+                }
+            );
+        Color glowColor = Colors.Primary.SetAlpha(0.2f * _hoverTransition);
+        Rect glowRect = new(buttonRect.x - 2, buttonRect.y - 2, buttonRect.width + 4, buttonRect.height + 4);
+        DrawRoundedBox(glowRect, glowColor, CornerRadius + 2);
 
         return GUI.Button(
             buttonRect,
             new GUIContent(text, tooltip),
             new GUIStyle
             {
-                fontSize = 20,
+                fontSize = 22,
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 normal = { textColor = textColor }

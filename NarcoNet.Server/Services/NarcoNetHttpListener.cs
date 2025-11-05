@@ -145,7 +145,7 @@ public class NarcoNetHttpListener : IHttpListener
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "NarcoNet: The deal went south at [{Method} {Path}]", context.Request.Method, context.Request.Path);
+            _logger.LogError(ex, "Error handling request [{Method} {Path}]", context.Request.Method, context.Request.Path);
             context.Response.StatusCode = 500;
             await context.Response.WriteAsync($"NarcoNet: Error handling [{context.Request.Method} {context.Request.Path}]:\n{ex}");
         }
@@ -153,11 +153,11 @@ public class NarcoNetHttpListener : IHttpListener
 
     public void Initialize(NarcoNetConfig config, string modVersion)
     {
-        _logger.LogInformation("NarcoNet: HttpListener.Initialize() called with version {Version}", modVersion);
+        _logger.LogDebug("HttpListener.Initialize() called with version {Version}", modVersion);
         _config = config;
         _modVersion = modVersion;
         _isInitialized = true;
-        _logger.LogInformation("NarcoNet: HttpListener initialized successfully (_isInitialized={IsInit})", _isInitialized);
+        _logger.LogDebug("HttpListener initialized successfully (_isInitialized={IsInit})", _isInitialized);
     }
 
     private async Task HandleGetVersion(HttpContext context)
@@ -281,7 +281,7 @@ public class NarcoNetHttpListener : IHttpListener
             string mimeType = _mimeTypeHelper.GetMimeType(extension) ?? "application/octet-stream";
 
             // Log the download
-            _logger.LogInformation("NarcoNet: 📦 Shipping '{FilePath}' ({FileSize} bytes) to client {ClientIp}",
+            _logger.LogInformation("Serving file '{FilePath}' ({FileSize} bytes) to {ClientIp}",
                 filePath, fileInfo.Length, clientIp);
 
             context.Response.Headers["Accept-Ranges"] = "bytes";
@@ -299,7 +299,7 @@ public class NarcoNetHttpListener : IHttpListener
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "NarcoNet: Can't access the stash at '{FilePath}'", filePath);
+            _logger.LogError(ex, "Error reading file '{FilePath}'", filePath);
             context.Response.StatusCode = 500;
             await context.Response.WriteAsync($"NarcoNet: Error reading '{filePath}'\n{ex}");
         }

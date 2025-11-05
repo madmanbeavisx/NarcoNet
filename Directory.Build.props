@@ -1,5 +1,5 @@
 <Project>
-    <!-- Solution-wide properties for UrGrannyOnFent.NarcoNet -->
+    <!-- Solution-wide properties for MadManBeavis.NarcoNet -->
     <PropertyGroup>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
@@ -9,10 +9,10 @@
         <AnalysisLevel>latest</AnalysisLevel>
 
         <!-- Branding -->
-        <Company>UrGrannyOnFent</Company>
+        <Company>MadManBeavis</Company>
         <Product>NarcoNet</Product>
-        <Copyright>Copyright © UrGrannyOnFent 2025</Copyright>
-        <Authors>UrGrannyOnFent</Authors>
+        <Copyright>Copyright © MadManBeavis 2025</Copyright>
+        <Authors>MadManBeavis</Authors>
 
         <!-- Version Info -->
         <VersionPrefix>1.0.0</VersionPrefix>

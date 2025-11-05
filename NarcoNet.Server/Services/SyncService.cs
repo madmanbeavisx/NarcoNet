@@ -30,7 +30,7 @@ public class SyncService
     {
         if (!Directory.Exists(dir))
         {
-            _logger.LogWarning("NarcoNet: Drop zone '{Dir}' doesn't exist - marking it off the route, patron.", dir);
+            _logger.LogWarning("Directory '{Dir}' does not exist", dir);
             return [];
         }
 
@@ -124,13 +124,13 @@ public class SyncService
             }
             catch (IOException ex) when (retryCount < 5)
             {
-                _logger.LogError("Package '{File}' is locked up tight. Sending another crew member... (Attempt {RetryCount}/5)", file, retryCount);
+                _logger.LogDebug("File '{File}' is locked, retrying... (Attempt {RetryCount}/5)", file, retryCount);
                 await Task.Delay(500, cancellationToken);
                 retryCount++;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "The feds got package '{File}' - aborting mission!", file);
+                _logger.LogError(ex, "Error reading file '{File}'", file);
                 throw new InvalidOperationException($"NarcoNet: Error reading '{file}'", ex);
             }
         }
@@ -175,7 +175,7 @@ public class SyncService
         }
 
         double elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
-        _logger.LogInformation("NarcoNet: Inventoried {Count} packages in the warehouse in {Elapsed:F0}ms", processedFiles.Count, elapsed);
+        _logger.LogDebug("Hashed {Count} files in {Elapsed:F0}ms", processedFiles.Count, elapsed);
 
         return result;
     }

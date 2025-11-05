@@ -43,6 +43,11 @@ public class TestLogger : ILogger
         AddLogEntry(LogLevel.Error, message ?? exception.Message, exception);
     }
 
+    public void LogDebug(string message, Exception? exception = null)
+    {
+        AddLogEntry(LogLevel.Debug, message, exception);
+    }
+
     private void AddLogEntry(LogLevel level, string message, Exception? exception = null)
     {
         lock (_lock)
@@ -61,17 +66,26 @@ public class TestLogger : ILogger
 
     public bool HasLogLevel(LogLevel level)
     {
-        return _logEntries.Any(e => e.Level == level);
+        lock (_lock)
+        {
+            return _logEntries.Any(e => e.Level == level);
+        }
     }
 
     public bool ContainsMessage(string substring)
     {
-        return _logEntries.Any(e => e.Message.IndexOf(substring, StringComparison.OrdinalIgnoreCase) >= 0);
+        lock (_lock)
+        {
+            return _logEntries.Any(e => e.Message.IndexOf(substring, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
     }
 
     public int GetLogCount(LogLevel level)
     {
-        return _logEntries.Count(e => e.Level == level);
+        lock (_lock)
+        {
+            return _logEntries.Count(e => e.Level == level);
+        }
     }
 }
 
@@ -79,7 +93,8 @@ public enum LogLevel
 {
     Information,
     Warning,
-    Error
+    Error,
+    Debug
 }
 
 public record LogEntry(LogLevel Level, string Message, Exception? Exception, DateTime Timestamp);

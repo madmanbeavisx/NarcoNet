@@ -54,6 +54,12 @@ public sealed class FileLogger : ILogger
     }
 
     /// <inheritdoc />
+    public void LogDebug(string message, Exception? exception = null)
+    {
+        throw new NotImplementedException();
+    }
+    
+    /// <inheritdoc />
     public void LogException(Exception exception, string? message = null)
     {
         string exceptionMessage = message != null
@@ -63,7 +69,7 @@ public sealed class FileLogger : ILogger
         WriteLog("ERROR", exceptionMessage);
         WriteLog("ERROR", $"Stack Trace: {exception.StackTrace}");
     }
-
+    
     /// <summary>
     ///     Creates a new logger instance with a custom log file path.
     /// </summary>

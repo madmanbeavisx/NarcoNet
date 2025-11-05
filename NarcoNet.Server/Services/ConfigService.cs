@@ -1,8 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+
+using JetBrains.Annotations;
+
 using NarcoNet.Server.Models;
+
 using SPTarkov.DI.Annotations;
-using SPTarkov.Server.Core.Utils;
+
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -13,71 +17,159 @@ namespace NarcoNet.Server.Services;
 /// Supports both YAML (.yaml/.yml) and JSON (.json/.jsonc) formats
 /// </summary>
 [Injectable]
+[UsedImplicitly]
 public class ConfigService
 {
     private const string DefaultYamlConfig = """
-# NarcoNet Configuration
-# Sync paths define what files/folders are synchronized from server to client
-# Use YAML for easier editing, or rename to config.json for JSON format
+                                             # ╔══════════════════════════════════════════════════════════════════════╗
+                                             # ║                    NarcoNet Configuration                            ║
+                                             # ║          Sync mods & plugins from SPT server to clients              ║
+                                             # ╚══════════════════════════════════════════════════════════════════════╝
+                                             #
+                                             # SPT 4.0 Folder Structure:
+                                             #   C:\SPT\                  <- Game root (EscapeFromTarkov.exe)
+                                             #   ├── BepInEx\             <- Client-side mods (synced to clients)
+                                             #   │   ├── plugins\         <- Client plugins
+                                             #   │   ├── patchers\        <- Client patchers
+                                             #   │   └── config\          <- Client configs
+                                             #   └── SPT\                 <- Server directory ** WE RUN FROM HERE **
+                                             #       ├── SPT.Server.exe
+                                             #       └── user\mods\       <- Server-side mods
+                                             #
+                                             # Path Reference Rules:
+                                             #   - Use "../" to reference the game folder from server folder
+                                             #   - Use "user/" to reference server folder contents (no prefix)
+                                             #
+                                             # Examples:
+                                             #   "../BepInEx/plugins"        -> C:\SPT\BepInEx\plugins
+                                             #   "user/mods"                 -> C:\SPT\SPT\user\mods
+                                             #   "../BepInEx/config"         -> C:\SPT\BepInEx\config
 
-syncPaths:
-  # Simple path format (uses defaults: enabled=true, enforced=false, restartRequired=true)
-  - BepInEx/plugins
-  - BepInEx/patchers
-  - BepInEx/config
+                                             syncPaths:
+                                               # Client-side mods (game folder - one level up)
+                                               - ../BepInEx/plugins
+                                               - ../BepInEx/patchers
+                                               - ../BepInEx/config
 
-  # Advanced format with full control
-  - name: "(Optional) Server mods"
-    path: user/mods
-    enabled: false           # Set to true to sync this path
-    enforced: false          # If true, re-syncs files deleted/modified by client
-    silent: false            # If true, updates without showing UI
-    restartRequired: false   # If true, prompts client to restart after update
+                                               # Server-side mods (in server folder)
+                                               - name: "(Optional) Server mods"
+                                                 path: user/mods
+                                                 enabled: false           # Set to true to sync this path
+                                                 enforced: false          # If true, re-syncs files deleted/modified by client
+                                                 silent: false            # If true, updates without showing UI
+                                                 restartRequired: false   # If true, prompts client to restart after update
 
-# Exclusions prevent specific files/patterns from being synced
-# Supports glob patterns like **/*.ext or specific paths
-exclusions:
-  # SPT Core (never sync)
-  - BepInEx/plugins/spt
-  - BepInEx/patchers/spt-prepatch.dll
+                                             # Exclusions prevent specific files/patterns from being synced
+                                             #
+                                             # Glob Pattern Examples:
+                                             #   **/*.log           - All .log files in any subdirectory
+                                             #   **/cache           - All 'cache' folders anywhere
+                                             #   **/node_modules    - All 'node_modules' folders (recursive)
+                                             #   user/mods/*/logs   - 'logs' folder in any immediate subdirectory of user/mods
+                                             #   **/*.{js,map}      - All .js and .map files anywhere
+                                             #   mod-name/**        - Everything inside 'mod-name' folder
+                                             #
+                                             # Special Characters:
+                                             #   *    - Matches any characters except /
+                                             #   **   - Matches any characters including / (recursive)
+                                             #   ?    - Matches exactly one character
+                                             #   [abc] - Matches any character in brackets
+                                             #   {a,b} - Matches any pattern in braces
+                                             #
+                                             # Remember: Use "../" prefix for game folder files, no prefix for server folder files
+                                             exclusions:
+                                               # SPT Core (never sync) - in game folder
+                                               - ../BepInEx/plugins/spt
+                                               - ../BepInEx/patchers/spt-prepatch.dll
 
-  # Common mod data folders
-  - BepInEx/plugins/DanW-SPTQuestingBots/log
-  - user/mods/SPT-Realism/ProfileBackups
-  - user/mods/fika-server/types
-  - user/mods/fika-server/cache
-  - BepInEx/plugins/Fika.Headless.dll
-  - user/mods/zzDrakiaXYZ-LiveFleaPrices/config
-  - BepInEx/plugins/kmyuhkyuk-EFTApi/cache
-  - user/mods/ExpandedTaskText/src/**/cache.json
-  - user/mods/leaves-loot_fuckery/output
-  - user/mods/zz_guiltyman-addmissingquestweaponrequirements/log.log
-  - user/mods/zz_guiltyman-addmissingquestweaponrequirements/user/logs
-  - user/mods/acidphantasm-progressivebotsystem/logs
+                                               # Common client mod data folders - in game folder
+                                               - ../BepInEx/plugins/DanW-SPTQuestingBots/log
+                                               - ../BepInEx/plugins/Fika.Headless.dll
+                                               - ../BepInEx/plugins/kmyuhkyuk-EFTApi/cache
 
-  # NarcoNet internal (synced via built-in paths)
-  - BepInEx/patchers/NarcoNet-Patcher.dll
+                                               # Common server mod data folders - in server folder
+                                               - user/mods/SPT-Realism/ProfileBackups
+                                               - user/mods/fika-server/types
+                                               - user/mods/fika-server/cache
+                                               - user/mods/zzDrakiaXYZ-LiveFleaPrices/config
+                                               - user/mods/ExpandedTaskText/src/**/cache.json
+                                               - user/mods/leaves-loot_fuckery/output
+                                               - user/mods/zz_guiltyman-addmissingquestweaponrequirements/log.log
+                                               - user/mods/zz_guiltyman-addmissingquestweaponrequirements/user/logs
+                                               - user/mods/acidphantasm-progressivebotsystem/logs
 
-  # Admin/Dev exclusions (use .nosync marker files)
-  - "**/*.nosync"
-  - "**/*.nosync.txt"
+                                               # NarcoNet internal (synced via built-in paths)
+                                               - ../BepInEx/patchers/MadManBeavis-NarcoNet-Patcher.dll
 
-  # Development files
-  - user/mods/**/.git
-  - user/mods/**/node_modules
-  - user/mods/**/*.js
-  - user/mods/**/*.js.map
+                                               # Admin/Dev exclusions (use .nosync marker files)
+                                               - "**/*.nosync"              # Any file ending in .nosync
+                                               - "**/*.nosync.txt"          # Any .nosync.txt file
 
-  # Windows metadata
-  - "**/*:Zone.Identifier"
-""";
+                                               # Development files (recursive patterns)
+                                               - user/mods/**/.git          # All .git folders in server mods
+                                               - user/mods/**/node_modules  # All node_modules folders
+                                               - user/mods/**/*.js          # All JavaScript files (recursive)
+                                               - user/mods/**/*.js.map      # All source maps (recursive)
+                                               - user/mods/**/*.ts          # All TypeScript source files
+                                               - "**/src/**/*.ts"           # All TS files in any 'src' folder
 
-    private readonly JsonUtil _jsonUtil;
+                                               # Log files (pattern matching)
+                                               - "**/*.log"                 # All .log files anywhere
+                                               - "**/logs/**"               # All files in any 'logs' folder
+                                               - "**/log/**"                # All files in any 'log' folder
 
-    public ConfigService(JsonUtil jsonUtil)
-    {
-        _jsonUtil = jsonUtil;
-    }
+                                               # Cache and temporary files
+                                               - "**/cache/**"              # All files in any 'cache' folder
+                                               - "**/temp/**"               # All files in any 'temp' folder
+                                               - "**/*.tmp"                 # All temporary files
+                                               - "**/*.cache"               # All cache files
+
+                                               # Windows metadata
+                                               - "**/*:Zone.Identifier"     # Windows download zone markers
+
+                                             # ═══════════════════════════════════════════════════════════════════════
+                                             # GLOB PATTERN QUICK REFERENCE
+                                             # ═══════════════════════════════════════════════════════════════════════
+                                             #
+                                             # Pattern Matching Wildcards:
+                                             #   *        Matches any characters EXCEPT / (single directory level)
+                                             #   **       Matches any characters INCLUDING / (multiple directory levels)
+                                             #   ?        Matches exactly ONE character
+                                             #   [abc]    Matches any character in brackets: a, b, or c
+                                             #   [a-z]    Matches any character in range: a through z
+                                             #   {a,b}    Matches either pattern: a OR b
+                                             #
+                                             # Real-World Examples:
+                                             #
+                                             #   *.dll                    # Only .dll files in root (not subdirectories)
+                                             #   **/*.dll                 # All .dll files recursively in any subdirectory
+                                             #   user/mods/*/config.json  # config.json in immediate subdirectories only
+                                             #   user/mods/**/config.json # config.json in any nested subdirectory
+                                             #   **/{logs,cache}          # Any folder named 'logs' OR 'cache' anywhere
+                                             #   **/*.{log,txt}           # All .log OR .txt files anywhere
+                                             #   mod-??.dll               # Matches: mod-01.dll, mod-ab.dll (2 chars)
+                                             #   config-[0-9].json        # Matches: config-0.json through config-9.json
+                                             #   !important.dll           # Negation - INCLUDE this file (override exclusion)
+                                             #
+                                             # Common Use Cases:
+                                             #
+                                             #   Exclude all logs:             - "**/*.log"
+                                             #   Exclude specific mod:         - "user/mods/problem-mod/**"
+                                             #   Exclude all node_modules:     - "**/node_modules/**"
+                                             #   Exclude TypeScript sources:   - "**/*.ts"
+                                             #   Exclude development folders:  - "**/{.git,node_modules,src}/**"
+                                             #   Exclude backup files:         - "**/*.{bak,backup,old}"
+                                             #   Exclude cache anywhere:       - "**/cache/**"
+                                             #
+                                             # Pro Tips:
+                                             #   - Use quotes around patterns with special chars: "**/*.{js,ts}"
+                                             #   - Remember "../" prefix for game folder paths
+                                             #   - Test patterns carefully - they match anywhere in the path
+                                             #   - More specific patterns = better performance
+                                             #   - Order doesn't matter - all patterns are checked
+                                             # ═══════════════════════════════════════════════════════════════════════
+                                             """;
+
 
     /// <summary>
     /// Load the NarcoNet configuration from file (supports YAML and JSON)
@@ -94,7 +186,7 @@ exclusions:
             await File.WriteAllTextAsync(configPath, DefaultYamlConfig);
         }
 
-        var (rawSyncPaths, exclusions) = await LoadConfigFileAsync(configPath);
+        (List<SyncPath> rawSyncPaths, List<string> exclusions) = await LoadConfigFileAsync(configPath);
 
         ValidateConfig(rawSyncPaths, exclusions, configPath);
 
@@ -116,7 +208,7 @@ exclusions:
                 Enforced = true,
                 Silent = true,
                 RestartRequired = true,
-                Path = "BepInEx/plugins/MadManBeavis-NarcoNet",
+                Path = "../BepInEx/plugins/MadManBeavis-NarcoNet",
                 Name = "(Builtin) NarcoNet Plugin"
             }
         };
@@ -139,17 +231,17 @@ exclusions:
     private static string? FindConfigFile(string modPath)
     {
         // Check YAML variants
-        var yamlPath = Path.Combine(modPath, "config.yaml");
+        string yamlPath = Path.Combine(modPath, "config.yaml");
         if (File.Exists(yamlPath)) return yamlPath;
 
-        var ymlPath = Path.Combine(modPath, "config.yml");
+        string ymlPath = Path.Combine(modPath, "config.yml");
         if (File.Exists(ymlPath)) return ymlPath;
 
         // Check JSON variants
-        var jsoncPath = Path.Combine(modPath, "config.jsonc");
+        string jsoncPath = Path.Combine(modPath, "config.jsonc");
         if (File.Exists(jsoncPath)) return jsoncPath;
 
-        var jsonPath = Path.Combine(modPath, "config.json");
+        string jsonPath = Path.Combine(modPath, "config.json");
         if (File.Exists(jsonPath)) return jsonPath;
 
         return null;
@@ -160,8 +252,8 @@ exclusions:
     /// </summary>
     private async Task<(List<SyncPath> syncPaths, List<string> exclusions)> LoadConfigFileAsync(string configPath)
     {
-        var extension = Path.GetExtension(configPath).ToLowerInvariant();
-        var configText = await File.ReadAllTextAsync(configPath);
+        string extension = Path.GetExtension(configPath).ToLowerInvariant();
+        string configText = await File.ReadAllTextAsync(configPath);
 
         return extension switch
         {
@@ -176,16 +268,16 @@ exclusions:
     /// </summary>
     private (List<SyncPath>, List<string>) LoadYamlConfig(string yamlContent)
     {
-        var deserializer = new DeserializerBuilder()
+        IDeserializer deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
 
-        var config = deserializer.Deserialize<YamlConfig>(yamlContent);
+        YamlConfig config = deserializer.Deserialize<YamlConfig>(yamlContent);
 
         var syncPaths = new List<SyncPath>();
         if (config.SyncPaths != null)
         {
-            foreach (var item in config.SyncPaths)
+            foreach (object item in config.SyncPaths)
             {
                 if (item is string pathStr)
                 {
@@ -203,23 +295,24 @@ exclusions:
                 else if (item is Dictionary<object, object> dict)
                 {
                     // Object format
-                    var path = dict.TryGetValue("path", out var p) ? p?.ToString()
+                    string? path = dict.TryGetValue("path", out object? p)
+                        ? p.ToString()
                         : throw new InvalidOperationException("Missing 'path' in syncPath object");
 
                     syncPaths.Add(new SyncPath
                     {
                         Path = path!,
-                        Name = dict.TryGetValue("name", out var n) ? n?.ToString() ?? path! : path!,
-                        Enabled = dict.TryGetValue("enabled", out var e) && e is bool enabled ? enabled : true,
-                        Enforced = dict.TryGetValue("enforced", out var enf) && enf is bool enforced ? enforced : false,
-                        Silent = dict.TryGetValue("silent", out var s) && s is bool silent ? silent : false,
-                        RestartRequired = dict.TryGetValue("restartRequired", out var r) && r is bool restart ? restart : true
+                        Name = dict.TryGetValue("name", out object? n) ? n.ToString() ?? path! : path!,
+                        Enabled = !dict.TryGetValue("enabled", out object? e) || e is not bool enabled || enabled,
+                        Enforced = dict.TryGetValue("enforced", out object? enf) && enf is bool and true,
+                        Silent = dict.TryGetValue("silent", out object? s) && s is bool and true,
+                        RestartRequired = !dict.TryGetValue("restartRequired", out object? r) || r is not bool restart || restart
                     });
                 }
             }
         }
 
-        var exclusions = config.Exclusions ?? [];
+        List<string> exclusions = config.Exclusions ?? [];
 
         return (syncPaths, exclusions);
     }
@@ -229,14 +322,14 @@ exclusions:
     /// </summary>
     private (List<SyncPath>, List<string>) LoadJsonConfig(string jsonContent)
     {
-        var jsonNode = JsonNode.Parse(jsonContent);
-        var syncPathsNode = jsonNode?["syncPaths"]?.AsArray();
-        var exclusionsNode = jsonNode?["exclusions"]?.AsArray();
+        JsonNode? jsonNode = JsonNode.Parse(jsonContent);
+        JsonArray? syncPathsNode = jsonNode?["syncPaths"]?.AsArray();
+        JsonArray? exclusionsNode = jsonNode?["exclusions"]?.AsArray();
 
         var rawSyncPaths = new List<SyncPath>();
         if (syncPathsNode != null)
         {
-            foreach (var node in syncPathsNode)
+            foreach (JsonNode? node in syncPathsNode)
             {
                 if (node is JsonValue && node.GetValueKind() == JsonValueKind.String)
                 {
@@ -255,7 +348,7 @@ exclusions:
                 else if (node is JsonObject obj)
                 {
                     // Object path
-                    var path = obj["path"]?.GetValue<string>() ?? throw new InvalidOperationException("Missing 'path' in syncPath object");
+                    string path = obj["path"]?.GetValue<string>() ?? throw new InvalidOperationException("Missing 'path' in syncPath object");
                     rawSyncPaths.Add(new SyncPath
                     {
                         Path = path,
@@ -272,7 +365,7 @@ exclusions:
         var exclusions = new List<string>();
         if (exclusionsNode != null)
         {
-            foreach (var node in exclusionsNode)
+            foreach (JsonNode? node in exclusionsNode)
             {
                 if (node is JsonValue)
                 {
@@ -296,19 +389,26 @@ exclusions:
             throw new InvalidOperationException($"NarcoNet: '{configPath}' 'exclusions' is not an array. Please verify your config is correct and try again.");
 
         var uniquePaths = new HashSet<string>();
-        foreach (var syncPath in syncPaths)
+
+        // Get the SPT root directory (parent of server directory for SPT 4.0)
+        string serverDir = Directory.GetCurrentDirectory();
+        string sptRoot = Path.GetFullPath(Path.Combine(serverDir, ".."));
+
+        foreach (string path in syncPaths.Select(syncPath => syncPath.Path))
         {
-            var path = syncPath.Path;
             if (string.IsNullOrEmpty(path))
                 throw new InvalidOperationException($"NarcoNet: '{configPath}' 'syncPaths' is missing 'path'. Please verify your config is correct and try again.");
 
             if (Path.IsPathRooted(path))
-                throw new InvalidOperationException($"NarcoNet: SyncPaths must be relative to SPT server root. Invalid path '{path}'");
+                throw new InvalidOperationException($"NarcoNet: SyncPaths must be relative paths. Invalid path '{path}'");
 
-            var fullPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
-            var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), fullPath);
-            if (relativePath.StartsWith(".."))
-                throw new InvalidOperationException($"NarcoNet: SyncPaths must be within SPT server root. Invalid path '{path}'");
+            // Resolve the full path
+            string fullPath = Path.GetFullPath(Path.Combine(serverDir, path));
+
+            // Check that the resolved path is within SPT root (allows "../" to reach game folder)
+            string relativePath = Path.GetRelativePath(sptRoot, fullPath);
+            if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                throw new InvalidOperationException($"NarcoNet: SyncPaths must stay within SPT installation folder. Invalid path '{path}' resolves outside SPT root.");
 
             if (!uniquePaths.Add(path))
                 throw new InvalidOperationException($"NarcoNet: SyncPaths must be unique. Duplicate path '{path}'");
@@ -321,9 +421,12 @@ exclusions:
     /// <summary>
     /// YAML config structure for deserialization
     /// </summary>
+    [UsedImplicitly]
     private class YamlConfig
     {
+        // ReSharper disable UnusedAutoPropertyAccessor.Local
         public List<object>? SyncPaths { get; set; }
         public List<string>? Exclusions { get; set; }
+        // ReSharper restore UnusedAutoPropertyAccessor.Local
     }
 }

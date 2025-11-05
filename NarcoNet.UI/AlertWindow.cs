@@ -105,7 +105,7 @@ internal class AlertButton(string text) : Bordered
             buttonColor = Color.Lerp(Colors.Primary, Colors.PrimaryLight, _hoverTransition);
         }
 
-        Color textColor = _active ? Colors.White : Colors.White;
+        Color textColor = Colors.White;
 
         // Draw shadow for depth
         if (!_active)

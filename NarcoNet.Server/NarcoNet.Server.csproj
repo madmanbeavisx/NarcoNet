@@ -53,6 +53,15 @@
 
     <ItemGroup>
         <None Include="package.json" CopyToOutputDirectory="Always" />
+        <None Remove="Build\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="Build\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="Build\**" />
     </ItemGroup>
 
 </Project>

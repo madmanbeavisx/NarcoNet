@@ -36,8 +36,8 @@ public static class ProgramEntry
         catch (Exception ex)
         {
             // Last resort error handling
-            Console.WriteLine($"💀 Operation completely compromised: {ex.Message}");
-            Console.WriteLine($"📋 Evidence trail: {ex.StackTrace}");
+            Console.WriteLine($"Fatal error: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
             return ApplicationCoordinator.ExitCode.UnexpectedError;
         }
     }
@@ -49,7 +49,7 @@ public static class ProgramEntry
     /// <param name="isSilentMode">Whether the application is in silent mode.</param>
     private static void HandleInvalidArguments(string errorMessage, bool isSilentMode)
     {
-        Console.WriteLine($"❌ Bad intel: {errorMessage}");
+        Console.WriteLine($"Invalid arguments: {errorMessage}");
         Console.WriteLine();
         Console.WriteLine(ApplicationConfiguration.UsageMessage);
 

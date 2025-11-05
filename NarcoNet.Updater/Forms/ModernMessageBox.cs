@@ -195,9 +195,9 @@ public class ModernMessageBox : Form
             // Draw icon symbol
             string symbol = icon switch
             {
-                MessageBoxIcon.Error => "✕",
-                MessageBoxIcon.Warning => "⚠",
-                MessageBoxIcon.Information => "ℹ",
+                MessageBoxIcon.Error => "X",
+                MessageBoxIcon.Warning => "!",
+                MessageBoxIcon.Information => "i",
                 MessageBoxIcon.Question => "?",
                 _ => ""
             };

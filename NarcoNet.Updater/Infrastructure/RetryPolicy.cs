@@ -54,7 +54,7 @@ public class RetryPolicy
                 TimeSpan delay = CalculateDelay(attempt);
 
                 _logger.LogWarning(
-                    $"⚠️ Mission compromised (attempt {attempt}/{_maxRetryAttempts}). Regrouping in {delay.TotalSeconds}s... Problem: {ex.Message}");
+                    $"Operation failed (attempt {attempt}/{_maxRetryAttempts}), retrying in {delay.TotalSeconds}s: {ex.Message}");
 
                 await Task.Delay(delay, cancellationToken);
             }
@@ -83,7 +83,7 @@ public class RetryPolicy
                 TimeSpan delay = CalculateDelay(attempt);
 
                 _logger.LogWarning(
-                    $"⚠️ Mission compromised (attempt {attempt}/{_maxRetryAttempts}). Regrouping in {delay.TotalSeconds}s... Problem: {ex.Message}");
+                    $"Operation failed (attempt {attempt}/{_maxRetryAttempts}), retrying in {delay.TotalSeconds}s: {ex.Message}");
 
                 await Task.Delay(delay, cancellationToken);
             }

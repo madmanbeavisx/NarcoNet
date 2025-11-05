@@ -15,7 +15,7 @@ public class Migrator(string baseDir)
 
     private List<string> CleanupFiles =>
     [
-        NarcoNetPath, Path.Combine(baseDir, @"BepInEx\patchers\UrGrannyOnFents-NarcoNet-Patcher.dll")
+        NarcoNetPath, Path.Combine(baseDir, @"BepInEx\patchers\MadManBeavis-NarcoNet-Patcher.dll")
     ];
 
     private Version DetectPreviousVersion()
@@ -42,7 +42,7 @@ public class Migrator(string baseDir)
         }
         catch (Exception e)
         {
-            NarcoPlugin.Logger.LogWarning("⚠️ Can't read the old ledger. Burning the evidence and starting fresh...");
+            NarcoPlugin.Logger.LogWarning("Unable to read previous version data, cleaning up...");
             NarcoPlugin.Logger.LogWarning(e);
         }
 
@@ -98,15 +98,15 @@ public class Migrator(string baseDir)
                 SyncPath? syncPath = syncPaths.Find(s => property.Name.StartsWith($"{s.Path}\\"));
                 if (syncPath == null)
                 {
-                    NarcoPlugin.Logger.LogWarning(
-                        $"⚠️ Old route '{property.Name}' is no longer in the smuggling network. Discarding...");
+                    NarcoPlugin.Logger.LogDebug(
+                        $"Sync path '{property.Name}' no longer exists, discarding...");
                     continue;
                 }
 
                 JObject modFile = (JObject)property.Value;
                 if (!modFile.ContainsKey("crc"))
                 {
-                    NarcoPlugin.Logger.LogWarning($"⚠️ Shipment record for '{property.Name}' is damaged. Can't verify the merchandise.");
+                    NarcoPlugin.Logger.LogWarning($"Sync record for '{property.Name}' is malformed");
                     continue;
                 }
 
@@ -151,7 +151,7 @@ public class Migrator(string baseDir)
         else if (oldVersion.Minor == pluginVersion.Minor && oldVersion != pluginVersion)
         {
             NarcoPlugin.Logger.LogWarning(
-                "⚠️ The last operation used different procedures. Could cause complications, but we're pushing forward...");
+                "Previous version mismatch detected - may cause issues");
         }
     }
 }

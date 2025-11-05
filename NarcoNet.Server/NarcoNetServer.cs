@@ -1,3 +1,5 @@
+using JetBrains.Annotations;
+
 using Microsoft.Extensions.Logging;
 
 using NarcoNet.Server.Models;
@@ -8,10 +10,10 @@ using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.Models.External;
 using SPTarkov.Server.Core.Models.Spt.Mod;
-using SPTarkov.Server.Core.Utils;
 
 using Range = SemanticVersioning.Range;
 using Version = SemanticVersioning.Version;
+#pragma warning disable CS8764 // Nullability of return type doesn't match overridden member (possibly because of nullability attributes).
 
 #pragma warning disable IDE0160
 namespace NarcoNet.Server;
@@ -20,6 +22,7 @@ namespace NarcoNet.Server;
 /// <summary>
 ///     Metadata for the NarcoNet server mod
 /// </summary>
+[UsedImplicitly]
 public record ModMetadata : AbstractModMetadata
 {
     public override string ModGuid { get; init; } = "com.madmanbeavis.narconet.server";
@@ -38,26 +41,14 @@ public record ModMetadata : AbstractModMetadata
 /// <summary>
 ///     Main NarcoNet server mod class
 /// </summary>
-[Injectable(TypePriority = OnLoadOrder.PreSptModLoader + 2)]
-public class NarcoNetServer : IPreSptLoadModAsync
+[Injectable(TypePriority = OnLoadOrder.PreSptModLoader + 2), UsedImplicitly]
+public class NarcoNetServer(
+    ILogger<NarcoNetServer> logger,
+    ConfigService configService,
+    NarcoNetHttpListener httpListener)
+    : IPreSptLoadModAsync
 {
     private static bool _loadFailed;
-    private readonly ConfigService _configService;
-    private readonly FileUtil _fileUtil;
-    private readonly NarcoNetHttpListener _httpListener;
-    private readonly ILogger<NarcoNetServer> _logger;
-
-    public NarcoNetServer(
-        ILogger<NarcoNetServer> logger,
-        ConfigService configService,
-        NarcoNetHttpListener httpListener,
-        FileUtil fileUtil)
-    {
-        _logger = logger;
-        _configService = configService;
-        _httpListener = httpListener;
-        _fileUtil = fileUtil;
-    }
 
     public async Task PreSptLoadAsync()
     {
@@ -68,46 +59,36 @@ public class NarcoNetServer : IPreSptLoadModAsync
             if (string.IsNullOrEmpty(modPath))
             {
                 _loadFailed = true;
-                _logger.LogError("NarcoNet: The cartel lost the supply route coordinates!");
+                logger.LogError("Failed to find mod directory");
                 return;
             }
 
             // Load configuration
-            NarcoNetConfig config = await _configService.LoadConfigAsync(modPath);
+            NarcoNetConfig config = await configService.LoadConfigAsync(modPath);
 
             // Check for files that will be synced to clients
             string updaterPath = Path.Combine(Directory.GetCurrentDirectory(), "NarcoNet.Updater.exe");
             string clientPluginDir = Path.Combine(Directory.GetCurrentDirectory(), @"..\", "BepInEx", "plugins", "MadManBeavis-NarcoNet");
 
-            if (!File.Exists(updaterPath))
-            {
-                _logger.LogInformation("NarcoNet: The courier (NarcoNet.Updater.exe) is missing. Place the courier in SPT root to enable deliveries to clients.");
-            }
-            else
-            {
-                _logger.LogInformation("NarcoNet: The courier is ready - client deliveries enabled");
-            }
+            logger.LogDebug(!File.Exists(updaterPath)
+                ? "NarcoNet.Updater.exe not found in SPT root - client updates disabled"
+                : "NarcoNet.Updater.exe found - client updates enabled");
 
-            if (!Directory.Exists(clientPluginDir))
-            {
-                _logger.LogInformation("NarcoNet: The stash house 'BepInEx/plugins/MadManBeavis-NarcoNet' doesn't exist. Create it and stock the merchandise to enable distribution to clients.");
-            }
-            else
-            {
-                _logger.LogInformation("NarcoNet: The stash house is stocked - ready to distribute merchandise");
-            }
+            logger.LogDebug(!Directory.Exists(clientPluginDir)
+                ? "BepInEx/plugins/MadManBeavis-NarcoNet directory not found - client plugin sync disabled"
+                : "BepInEx/plugins/MadManBeavis-NarcoNet directory found - client plugin sync enabled");
 
             // Initialize HTTP listener (only if load succeeded)
             if (!_loadFailed)
             {
-                _httpListener.Initialize(config, NarcoNetVersion.Version);
-                _logger.LogInformation("NarcoNet: The cartel's operations are now live, compadre!");
+                httpListener.Initialize(config, NarcoNetVersion.Version);
+                logger.LogInformation("NarcoNet server mod loaded successfully");
             }
         }
         catch (Exception ex)
         {
             _loadFailed = true;
-            _logger.LogError(ex, "NarcoNet: The operation plans got scrambled, jefe!");
+            logger.LogError(ex, "Failed to load NarcoNet server mod");
             throw;
         }
     }

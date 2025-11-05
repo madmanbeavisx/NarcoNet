@@ -184,12 +184,12 @@ public sealed class UpdateProgressForm : Form
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("🛑 Operation cancelled. The boss called it off!");
+            _logger.LogInformation("Update cancelled by user");
             Close();
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex, "💀 Everything went sideways! Operation is a complete disaster!");
+            _logger.LogException(ex, "Critical error during update");
             ModernMessageBox.ShowError(
                 $"A critical error occurred during the update: {ex.Message}",
                 "Update Failed"

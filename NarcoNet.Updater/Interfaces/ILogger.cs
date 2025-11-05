@@ -29,4 +29,11 @@ public interface ILogger
     /// <param name="exception">The exception to log.</param>
     /// <param name="message">Optional message to accompany the exception.</param>
     void LogException(Exception exception, string? message = null);
+
+    /// <summary>
+    /// Logs a debug message for tracing or diagnostic purposes.
+    /// </summary>
+    /// <param name="message">The debug message to log.</param>
+    /// <param name="exception">Optional exception to include additional context.</param>
+    void LogDebug(string message, Exception? exception = null);
 }

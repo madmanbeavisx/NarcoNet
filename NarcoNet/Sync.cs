@@ -187,8 +187,8 @@ public static class Sync
         }
 
         watch.Stop();
-        NarcoPlugin.Logger.LogInfo(
-            $"🔍 Catalogued {processedFiles.Count} packages in the warehouse in {watch.Elapsed.TotalMilliseconds}ms");
+        NarcoPlugin.Logger.LogDebug(
+            $"Hashed {processedFiles.Count} files in {watch.Elapsed.TotalMilliseconds}ms");
 
         return results;
     }
@@ -208,7 +208,7 @@ public static class Sync
         }
         catch (Exception e)
         {
-            NarcoPlugin.Logger.LogError($"💥 Error verifying package '{file}': {e.Message}");
+            NarcoPlugin.Logger.LogError($"Error hashing file '{file}': {e.Message}");
             hash = "";
         }
 
