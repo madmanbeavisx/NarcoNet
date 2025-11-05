@@ -1,0 +1,51 @@
+<Project>
+    <!-- Solution-wide post-build: Deploy entire Build folder to test locations -->
+    <Target Name="DeployToTestLocations" AfterTargets="Build" Condition="'$(DeployAfterBuild)' == 'true'">
+        <Message Importance="high" Text="Deploying Build folder to test locations..." />
+
+        <!-- Copy BepInEx folder contents -->
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\BepInEx\*&quot; &quot;C:\SPT\SPT\BepInEx\&quot; /S /Y /I /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\BepInEx')" />
+
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\BepInEx\*&quot; &quot;C:\SPT - Copy\BepInEx\&quot; /S /Y /I /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\BepInEx')" />
+
+        <!-- Copy SPT root files (updater and DLLs) -->
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.exe&quot; &quot;C:\SPT\SPT\&quot; /Y /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
+
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.dll&quot; &quot;C:\SPT\SPT\&quot; /Y /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
+
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.exe&quot; &quot;C:\SPT - Copy\&quot; /Y /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
+
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\*.dll&quot; &quot;C:\SPT - Copy\&quot; /Y /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT')" />
+
+        <!-- Copy SPT user/mods folder -->
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\user\*&quot; &quot;C:\SPT\SPT\user\&quot; /S /Y /I /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT\user')" />
+
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)Build\SPT\user\*&quot; &quot;C:\SPT - Copy\user\&quot; /S /Y /I /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT\user')" />
+
+        <Message Importance="high" Text="Deployment to test locations complete!" />
+    </Target>
+</Project>

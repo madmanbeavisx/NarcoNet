@@ -23,13 +23,13 @@ public class Bordered
     protected static void DrawRoundedBorder(Rect rect, int thickness, Color color, int cornerRadius)
     {
         // Draw rounded border by drawing a larger rounded rect and then drawing a smaller one on top
-        int width = (int)rect.width;
-        int height = (int)rect.height;
+        int width = Mathf.Max(1, (int)rect.width);
+        int height = Mathf.Max(1, (int)rect.height);
 
         Texture2D outerTexture = Utility.GetRoundedTexture(width, height, cornerRadius, color);
         Texture2D innerTexture = Utility.GetRoundedTexture(
-            width - thickness * 2,
-            height - thickness * 2,
+            Mathf.Max(1, width - thickness * 2),
+            Mathf.Max(1, height - thickness * 2),
             Mathf.Max(0, cornerRadius - thickness),
             new Color(0, 0, 0, 0)
         );
@@ -50,7 +50,9 @@ public class Bordered
             Utility.DrawShadow(rect, 0, 3, 6);
         }
 
-        Texture2D texture = Utility.GetRoundedTexture((int)rect.width, (int)rect.height, cornerRadius, color);
+        int width = Mathf.Max(1, (int)rect.width);
+        int height = Mathf.Max(1, (int)rect.height);
+        Texture2D texture = Utility.GetRoundedTexture(width, height, cornerRadius, color);
         GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, true);
     }
 
@@ -69,8 +71,8 @@ public class Bordered
             Texture2D gradientTexture = Utility.GetGradientTexture(
                 colorStart,
                 colorEnd,
-                horizontal ? (int)rect.width : 1,
-                horizontal ? 1 : (int)rect.height,
+                horizontal ? Mathf.Max(1, (int)rect.width) : 1,
+                horizontal ? 1 : Mathf.Max(1, (int)rect.height),
                 horizontal
             );
             // Note: This is a simplified approach. For perfect rounded gradients,
@@ -82,8 +84,8 @@ public class Bordered
             Texture2D gradientTexture = Utility.GetGradientTexture(
                 colorStart,
                 colorEnd,
-                horizontal ? (int)rect.width : 1,
-                horizontal ? 1 : (int)rect.height,
+                horizontal ? Mathf.Max(1, (int)rect.width) : 1,
+                horizontal ? 1 : Mathf.Max(1, (int)rect.height),
                 horizontal
             );
             GUI.DrawTexture(rect, gradientTexture, ScaleMode.StretchToFill, true);

@@ -237,7 +237,17 @@ public class NarcoNetHttpListener : IHttpListener
                     .ToList();
             }
 
-            Dictionary<string, Dictionary<string, ModFile>> hashes = await _syncService.HashModFilesAsync(pathsToHash, _config, context.RequestAborted);
+            Dictionary<string, Dictionary<string, ModFile>> hashResults = await _syncService.HashModFilesAsync(pathsToHash, _config, context.RequestAborted);
+
+            // Convert ModFile objects to just hash strings for client
+            Dictionary<string, Dictionary<string, string>> hashes = hashResults.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value.ToDictionary(
+                    fileKvp => fileKvp.Key,
+                    fileKvp => fileKvp.Value.Hash
+                )
+            );
+
             json = JsonSerializer.Serialize(hashes);
         }
 
@@ -253,6 +263,7 @@ public class NarcoNetHttpListener : IHttpListener
     {
         string pathSegment = context.Request.Path.Value?.Replace("/narconet/fetch/", "") ?? "";
         string filePath = Uri.UnescapeDataString(pathSegment);
+        string clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
         try
         {
@@ -268,6 +279,10 @@ public class NarcoNetHttpListener : IHttpListener
             FileInfo fileInfo = new(sanitizedPath);
             string extension = Path.GetExtension(filePath);
             string mimeType = _mimeTypeHelper.GetMimeType(extension) ?? "application/octet-stream";
+
+            // Log the download
+            _logger.LogInformation("NarcoNet: 📦 Shipping '{FilePath}' ({FileSize} bytes) to client {ClientIp}",
+                filePath, fileInfo.Length, clientIp);
 
             context.Response.Headers["Accept-Ranges"] = "bytes";
             context.Response.ContentType = mimeType;

@@ -1,0 +1,8 @@
+{
+  "name": "narconet-server",
+  "version": "1.0.0",
+  "author": "MadManBeavis",
+  "license": "MIT",
+  "main": "NarcoNet.Server.dll",
+  "sptVersion": "~4.0.0"
+}

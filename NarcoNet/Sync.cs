@@ -78,13 +78,21 @@ public static class Sync
                 }
 
                 IEnumerable<string> query;
-                // NOTE: For ENFORCED paths, deleted files are handled in GetAddedFiles (they get re-downloaded)
-                // For NON-ENFORCED paths, only remove files that the SERVER deleted
-                query = !previousRemoteModFiles.TryGetValue(syncPath.Path, out Dictionary<string, ModFile>? previousPathFiles)
-                    ? []
-                    : previousPathFiles
-                        .Keys.Intersect(localPathFiles.Keys, StringComparer.OrdinalIgnoreCase)
-                        .Except(remoteModFiles[syncPath.Path].Keys, StringComparer.OrdinalIgnoreCase);
+                if (syncPath.Enforced)
+                {
+                    // For ENFORCED paths, remove any local files that don't exist on the server
+                    query = localPathFiles.Keys.Except(remoteModFiles[syncPath.Path].Keys, StringComparer.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    // For NON-ENFORCED paths, only remove files that the SERVER explicitly deleted
+                    // (files that existed in previous sync, still exist locally, but are gone from server)
+                    query = !previousRemoteModFiles.TryGetValue(syncPath.Path, out Dictionary<string, ModFile>? previousPathFiles)
+                        ? []
+                        : previousPathFiles
+                            .Keys.Intersect(localPathFiles.Keys, StringComparer.OrdinalIgnoreCase)
+                            .Except(remoteModFiles[syncPath.Path].Keys, StringComparer.OrdinalIgnoreCase);
+                }
 
                 return new KeyValuePair<string, List<string>>(syncPath.Path, query.ToList());
             })

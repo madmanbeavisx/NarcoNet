@@ -148,6 +148,8 @@ public class SyncService
         ConcurrentDictionary<string, byte> processedFiles = new();
         DateTime startTime = DateTime.UtcNow;
 
+        string baseDir = Directory.GetCurrentDirectory();
+
         foreach (SyncPath syncPath in syncPaths)
         {
             string fullPath = Path.GetFullPath(syncPath.Path);
@@ -157,7 +159,9 @@ public class SyncService
             // Process files in parallel
             await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
             {
-                string winPath = PathHelper.ToWindowsPath(file);
+                // Convert absolute path to relative path from server root
+                string relativePath = Path.GetRelativePath(baseDir, file);
+                string winPath = PathHelper.ToWindowsPath(relativePath);
                 if (processedFiles.TryAdd(winPath, 0))
                 {
                     ModFile modFile = await BuildModFileAsync(file, ct);
@@ -165,7 +169,9 @@ public class SyncService
                 }
             });
 
-            result[PathHelper.ToWindowsPath(fullPath)] = new Dictionary<string, ModFile>(filesResult);
+            // Use relative sync path as dictionary key
+            string relativeSyncPath = Path.GetRelativePath(baseDir, fullPath);
+            result[PathHelper.ToWindowsPath(relativeSyncPath)] = new Dictionary<string, ModFile>(filesResult);
         }
 
         double elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;

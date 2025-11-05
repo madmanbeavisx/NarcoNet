@@ -305,11 +305,50 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         );
 
         Logger.LogInfo($"📦 The cartel has {UpdateCount} packages ready for delivery, plata o plomo!");
-        Logger.LogInfo($"  ➕ {_addedFiles.SelectMany(path => path.Value).Count()} new shipments arriving");
-        Logger.LogInfo($"  🔄 {_updatedFiles.SelectMany(path => path.Value).Count()} packages repackaged");
+
+        // Log added files
+        int addedCount = _addedFiles.SelectMany(path => path.Value).Count();
+        Logger.LogInfo($"  ➕ {addedCount} new shipments arriving");
+        if (addedCount > 0)
+        {
+            foreach (var syncPath in _addedFiles.Where(kvp => kvp.Value.Count > 0))
+            {
+                Logger.LogDebug($"    [{syncPath.Key}]");
+                foreach (var file in syncPath.Value)
+                {
+                    Logger.LogDebug($"      + {file}");
+                }
+            }
+        }
+
+        // Log updated files
+        int updatedCount = _updatedFiles.SelectMany(path => path.Value).Count();
+        Logger.LogInfo($"  🔄 {updatedCount} packages repackaged");
+        if (updatedCount > 0)
+        {
+            foreach (var syncPath in _updatedFiles.Where(kvp => kvp.Value.Count > 0))
+            {
+                Logger.LogDebug($"    [{syncPath.Key}]");
+                foreach (var file in syncPath.Value)
+                {
+                    Logger.LogDebug($"      ↻ {file}");
+                }
+            }
+        }
+
+        // Log removed files
         if (_removedFiles.Count > 0)
         {
-            Logger.LogInfo($"  ❌ {_removedFiles.SelectMany(path => path.Value).Count()} packages eliminated");
+            int removedCount = _removedFiles.SelectMany(path => path.Value).Count();
+            Logger.LogInfo($"  ❌ {removedCount} packages eliminated");
+            foreach (var syncPath in _removedFiles.Where(kvp => kvp.Value.Count > 0))
+            {
+                Logger.LogDebug($"    [{syncPath.Key}]");
+                foreach (var file in syncPath.Value)
+                {
+                    Logger.LogDebug($"      - {file}");
+                }
+            }
         }
 
         if (UpdateCount > 0)
@@ -691,9 +730,10 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             yield break;
         }
 
+        Logger.LogInfo("⏳ Waiting for the warehouse to open...");
         yield return new WaitUntil(() => Singleton<CommonUI>.Instantiated);
 
-        Logger.LogDebug("🔍 Counting the inventory in our warehouse...");
+        Logger.LogInfo("🔍 Counting the inventory in our warehouse...");
         if (exclusions == null)
         {
             yield break;
@@ -708,11 +748,25 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             );
 
             yield return new WaitUntil(() => localModFilesTask.IsCompleted);
+
+            if (localModFilesTask.IsFaulted)
+            {
+                Logger.LogError($"Failed to hash local files: {localModFilesTask.Exception?.GetType().Name}: {localModFilesTask.Exception?.Message}");
+                if (localModFilesTask.Exception?.InnerException != null)
+                {
+                    Logger.LogError($"Inner exception: {localModFilesTask.Exception.InnerException.GetType().Name}: {localModFilesTask.Exception.InnerException.Message}");
+                }
+                Logger.LogError($"Stack trace: {localModFilesTask.Exception?.StackTrace}");
+                yield break;
+            }
+
             SyncPathModFiles localModFiles = localModFilesTask.Result;
+
+            Logger.LogInfo($"✅ Warehouse inventory complete: {localModFiles.Sum(kvp => kvp.Value.Count)} items catalogued");
 
             VFS.WriteTextFile(LocalHashesPath, Json.Serialize(localModFiles));
 
-            Logger.LogDebug("📋 Getting the boss's inventory list...");
+            Logger.LogInfo("📋 Getting the boss's inventory list...");
             Task<Dictionary<string, Dictionary<string, string>>>? remoteHashesTask =
                 _server?.GetRemoteHashes(EnabledSyncPaths);
             yield return new WaitUntil(() => remoteHashesTask is { IsCompleted: true });
@@ -724,54 +778,60 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 _remoteModFiles = EnabledSyncPaths
                     .Select(syncPath =>
                         {
-                            Dictionary<string, string>? remotePathHashes = remoteHashes?[syncPath.Path];
+                            // Get remote hashes for this path, or empty dict if path doesn't exist on server
+                            Dictionary<string, string>? remotePathHashes = remoteHashes?.TryGetValue(syncPath.Path, out var hashes) == true ? hashes : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
                             if (!syncPath.Enforced)
                             {
-                                if (remotePathHashes != null)
-                                {
-                                    remotePathHashes = remotePathHashes
-                                        .Where(kvp => !Sync.IsExcluded(localExclusionsForRemote, kvp.Key))
-                                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
-                                }
+                                // Filter out locally excluded files for non-enforced paths
+                                remotePathHashes = remotePathHashes
+                                    .Where(kvp => !Sync.IsExcluded(localExclusionsForRemote, kvp.Key))
+                                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
                             }
 
-                            if (remotePathHashes != null)
-                            {
-                                Dictionary<string, ModFile> remoteModFilesForPath = remotePathHashes
-                                    .ToDictionary(
-                                        kvp => kvp.Key,
-                                        kvp => new ModFile(kvp.Value, kvp.Key.EndsWith("\\") || kvp.Key.EndsWith("/")),
-                                        StringComparer.OrdinalIgnoreCase
-                                    );
+                            Dictionary<string, ModFile> remoteModFilesForPath = remotePathHashes
+                                .ToDictionary(
+                                    kvp => kvp.Key,
+                                    kvp => new ModFile(kvp.Value, kvp.Key.EndsWith("\\") || kvp.Key.EndsWith("/")),
+                                    StringComparer.OrdinalIgnoreCase
+                                );
 
-                                return new KeyValuePair<string, Dictionary<string, ModFile>>(syncPath.Path, remoteModFilesForPath);
-                            }
-
-                            return default;
+                            return new KeyValuePair<string, Dictionary<string, ModFile>>(syncPath.Path, remoteModFilesForPath);
                         }
                     )
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.LogError($"Failed to get remote hashes: {e.GetType().Name}: {e.Message}");
+                Logger.LogError($"Stack trace: {e.StackTrace}");
+                if (e.InnerException != null)
+                {
+                    Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                }
                 Chainloader.DependencyErrors.Add(
-                    $"Could not load {Info.Metadata.Name} due to error requesting server mod list. Please check the server log and try again."
+                    $"Could not load {Info.Metadata.Name} due to error requesting server mod list: {e.Message}"
                 );
+                yield break;
             }
 
-            Logger.LogDebug("⚖️ Comparing our inventory with the boss's orders...");
+            Logger.LogInfo("⚖️ Comparing our inventory with the boss's orders...");
             try
             {
                 AnalyzeModFiles(localModFiles);
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.LogError($"Failed to analyze mod files: {e.GetType().Name}: {e.Message}");
+                Logger.LogError($"Stack trace: {e.StackTrace}");
+                if (e.InnerException != null)
+                {
+                    Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                }
                 Chainloader.DependencyErrors.Add(
-                    $"Could not load {Info.Metadata.Name} due to error hashing local mods. Please ensure none of the files are open and try again."
+                    $"Could not load {Info.Metadata.Name} due to error analyzing mod files: {e.Message}"
                 );
+                yield break;
             }
         }
     }

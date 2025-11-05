@@ -35,7 +35,7 @@ internal class ServerModule(Version pluginVersion)
 
         string downloadPath = Path.Combine(path, file);
 
-        VFS.CreateDirectory(path.GetDirectory());
+        VFS.CreateDirectory(downloadPath.GetDirectory());
 
         int retryCount = 0;
 
@@ -115,7 +115,7 @@ internal class ServerModule(Version pluginVersion)
         try
         {
             string json = await GetJsonTask($"/narconet/hashes?path={string.Join("&path=",
-                paths.Select(path => Uri.EscapeDataString(path.Path.Replace(@"\", "/").TrimEnd('/'))))}");
+                paths.Select(path => Uri.EscapeDataString(path.Path.Replace(@"\", "/"))))}");
 
             Dictionary<string, Dictionary<string, string>>? rawData =
                 Json.Deserialize<Dictionary<string, Dictionary<string, string>>>(json);

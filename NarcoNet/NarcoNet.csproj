@@ -4,6 +4,9 @@
         <TargetFramework>net472</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+
+        <!-- Enable deployment after build -->
+        <DeployAfterBuild>true</DeployAfterBuild>
     </PropertyGroup>
 
     <ItemGroup>
@@ -81,7 +84,7 @@
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <PropertyGroup>
-            <BuildOutputDir>$(SolutionDir)Build\BepInEx\plugins\MadManBeavis-NarcoNet</BuildOutputDir>
+            <BuildOutputDir>$(MSBuildProjectDirectory)\..\Build\BepInEx\plugins\MadManBeavis-NarcoNet</BuildOutputDir>
         </PropertyGroup>
 
         <!-- Create output directory structure -->

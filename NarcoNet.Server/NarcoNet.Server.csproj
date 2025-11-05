@@ -16,6 +16,9 @@
         <DebugType>none</DebugType>
         <DebugSymbols>false</DebugSymbols>
         <GenerateDependencyFile>false</GenerateDependencyFile>
+
+        <!-- Enable deployment after build -->
+        <DeployAfterBuild>true</DeployAfterBuild>
     </PropertyGroup>
 
     <ItemGroup>
