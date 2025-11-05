@@ -56,7 +56,7 @@ public sealed class FileLogger : ILogger
     /// <inheritdoc />
     public void LogDebug(string message, Exception? exception = null)
     {
-        throw new NotImplementedException();
+        WriteLog("DEBUG", message);
     }
     
     /// <inheritdoc />
