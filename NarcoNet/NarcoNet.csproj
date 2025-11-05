@@ -16,6 +16,7 @@
     <ItemGroup>
         <ProjectReference Include="..\NarcoNet.Utilities\NarcoNet.Utilities.csproj"/>
         <ProjectReference Include="..\NarcoNet.UI\NarcoNet.UI.csproj"/>
+        <ProjectReference Include="..\NarcoNet.Updater\NarcoNet.Updater.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

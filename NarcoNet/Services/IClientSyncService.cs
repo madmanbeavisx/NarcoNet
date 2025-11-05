@@ -78,4 +78,16 @@ public interface IClientSyncService
         SyncPathFileList removedFiles,
         List<SyncPath> enabledSyncPaths,
         bool deleteRemovedFiles);
+
+    /// <summary>
+    ///     Writes an update manifest for the updater exe to process
+    /// </summary>
+    void WriteUpdateManifest(
+        SyncPathFileList addedFiles,
+        SyncPathFileList updatedFiles,
+        SyncPathFileList directoriesToCreate,
+        SyncPathFileList removedFiles,
+        List<SyncPath> enabledSyncPaths,
+        bool deleteRemovedFiles,
+        string pendingUpdatesDir);
 }

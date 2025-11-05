@@ -45,11 +45,17 @@ public sealed class ApplicationCoordinator
             NarcoNetConstants.RemovedFilesFileName
         );
 
+        string updateManifestPath = Path.Combine(
+            dataDirectory,
+            NarcoNetConstants.UpdateManifestFileName
+        );
+
         _fileUpdateService = new FileUpdateService(
             _logger,
             updateDirectory,
             removedFilesPath,
-            Directory.GetCurrentDirectory()
+            Directory.GetCurrentDirectory(),
+            updateManifestPath
         );
     }
 

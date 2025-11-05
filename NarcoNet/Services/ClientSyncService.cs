@@ -1,4 +1,5 @@
 using BepInEx.Logging;
+using NarcoNet.Updater.Models;
 using NarcoNet.Utilities;
 using SPT.Common.Utils;
 
@@ -214,6 +215,69 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         {
             VFS.WriteTextFile(RemovedFilesPath, Json.Serialize(removedFiles.SelectMany(kvp => kvp.Value).ToList()));
         }
+    }
+
+    /// <summary>
+    ///     Writes an update manifest for the updater exe to process
+    /// </summary>
+    public void WriteUpdateManifest(
+        SyncPathFileList addedFiles,
+        SyncPathFileList updatedFiles,
+        SyncPathFileList directoriesToCreate,
+        SyncPathFileList removedFiles,
+        List<SyncPath> enabledSyncPaths,
+        bool deleteRemovedFiles,
+        string pendingUpdatesDir)
+    {
+        UpdateManifest manifest = new();
+
+        // Add directory creation operations
+        foreach (SyncPath syncPath in enabledSyncPaths)
+        {
+            foreach (string dir in directoriesToCreate[syncPath.Path])
+            {
+                manifest.Operations.Add(new UpdateOperation
+                {
+                    Type = OperationType.CreateDirectory,
+                    Destination = dir
+                });
+            }
+        }
+
+        // Add file copy operations
+        foreach (SyncPath syncPath in enabledSyncPaths.Where(sp => sp.RestartRequired))
+        {
+            foreach (string file in addedFiles[syncPath.Path].Concat(updatedFiles[syncPath.Path]))
+            {
+                manifest.Operations.Add(new UpdateOperation
+                {
+                    Type = OperationType.CopyFile,
+                    Source = file,
+                    Destination = file
+                });
+            }
+        }
+
+        // Add file deletion operations
+        foreach (SyncPath syncPath in enabledSyncPaths)
+        {
+            if ((deleteRemovedFiles || syncPath.Enforced) && removedFiles[syncPath.Path].Count > 0)
+            {
+                foreach (string file in removedFiles[syncPath.Path])
+                {
+                    manifest.Operations.Add(new UpdateOperation
+                    {
+                        Type = OperationType.DeleteFile,
+                        Destination = file
+                    });
+                }
+            }
+        }
+
+        string manifestPath = Path.Combine(NarcoNetDir, NarcoNetConstants.UpdateManifestFileName);
+        VFS.WriteTextFile(manifestPath, Json.Serialize(manifest));
+
+        logger.LogDebug($"Wrote update manifest with {manifest.Operations.Count} operations");
     }
 
     private void LogFileChanges(string changeType, SyncPathFileList changes)

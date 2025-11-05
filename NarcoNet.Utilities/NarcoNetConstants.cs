@@ -21,6 +21,7 @@ public static class NarcoNetConstants
     public const string PendingUpdatesDirectoryName = "PendingUpdates";
     public const string LogFileName = "NarcoNet.log";
     public const string RemovedFilesFileName = "RemovedFiles.json";
+    public const string UpdateManifestFileName = "UpdateManifest.json";
 
     // Updater
     public const string UpdaterExecutableName = "NarcoNet.Updater.exe";

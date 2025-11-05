@@ -307,6 +307,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             if (!_cts.IsCancellationRequested)
             {
                 _syncService.WriteNarcoNetData(_remoteModFiles, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value);
+                _syncService.WriteUpdateManifest(_addedFiles, _updatedFiles, _createdDirectories, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value, PendingUpdatesDir);
 
                 if (NoRestartMode)
                 {

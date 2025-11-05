@@ -43,7 +43,7 @@ public class FileUpdateServiceTests : IDisposable
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         // Act
-        Action act = () => new FileUpdateService(null!, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        Action act = () => new FileUpdateService(null!, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -54,7 +54,7 @@ public class FileUpdateServiceTests : IDisposable
     public void Constructor_WithNullUpdateStagingDirectory_ThrowsArgumentNullException()
     {
         // Act
-        Action act = () => new FileUpdateService(_logger, null!, _removedFilesManifestPath, _testDirectory);
+        Action act = () => new FileUpdateService(_logger, null!, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -65,7 +65,7 @@ public class FileUpdateServiceTests : IDisposable
     public void Constructor_WithNullRemovedFilesManifestPath_ThrowsArgumentNullException()
     {
         // Act
-        Action act = () => new FileUpdateService(_logger, _updateStagingDirectory, null!, _testDirectory);
+        Action act = () => new FileUpdateService(_logger, _updateStagingDirectory, null!, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -76,7 +76,7 @@ public class FileUpdateServiceTests : IDisposable
     public void Constructor_WithNullTargetDirectory_ThrowsArgumentNullException()
     {
         // Act
-        Action act = () => new FileUpdateService(_logger, _updateStagingDirectory, _removedFilesManifestPath, null!);
+        Action act = () => new FileUpdateService(_logger, _updateStagingDirectory, _removedFilesManifestPath, null!, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -87,7 +87,7 @@ public class FileUpdateServiceTests : IDisposable
     public void HasPendingUpdates_WithEmptyDirectory_ReturnsFalse()
     {
         // Arrange
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         bool hasPendingUpdates = service.HasPendingUpdates();
@@ -101,7 +101,7 @@ public class FileUpdateServiceTests : IDisposable
     {
         // Arrange
         File.WriteAllText(Path.Combine(_updateStagingDirectory, "test.txt"), "content");
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         bool hasPendingUpdates = service.HasPendingUpdates();
@@ -114,7 +114,7 @@ public class FileUpdateServiceTests : IDisposable
     public void GetPendingUpdateFiles_WithNoFiles_ReturnsEmpty()
     {
         // Arrange
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         IEnumerable<string> files = service.GetPendingUpdateFiles();
@@ -131,7 +131,7 @@ public class FileUpdateServiceTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_updateStagingDirectory, "subdir"));
         File.WriteAllText(Path.Combine(_updateStagingDirectory, "subdir", "file2.txt"), "content");
 
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         List<string> files = service.GetPendingUpdateFiles().ToList();
@@ -146,7 +146,7 @@ public class FileUpdateServiceTests : IDisposable
     public async Task ApplyPendingUpdatesAsync_WithNoFiles_CompletesSuccessfully()
     {
         // Arrange
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.ApplyPendingUpdatesAsync();
@@ -160,7 +160,7 @@ public class FileUpdateServiceTests : IDisposable
     {
         // Arrange
         File.WriteAllText(Path.Combine(_updateStagingDirectory, "test.txt"), "test content");
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.ApplyPendingUpdatesAsync();
@@ -180,7 +180,7 @@ public class FileUpdateServiceTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(nestedPath)!);
         File.WriteAllText(nestedPath, "nested content");
 
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.ApplyPendingUpdatesAsync();
@@ -199,7 +199,7 @@ public class FileUpdateServiceTests : IDisposable
         File.WriteAllText(targetFile, "old content");
         File.WriteAllText(Path.Combine(_updateStagingDirectory, "overwrite.txt"), "new content");
 
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.ApplyPendingUpdatesAsync();
@@ -213,7 +213,7 @@ public class FileUpdateServiceTests : IDisposable
     {
         // Arrange
         File.WriteAllText(Path.Combine(_updateStagingDirectory, "test.txt"), "content");
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
         CancellationTokenSource cts = new();
         cts.Cancel();
 
@@ -228,7 +228,7 @@ public class FileUpdateServiceTests : IDisposable
     public async Task DeleteRemovedFilesAsync_WithNoManifest_CompletesSuccessfully()
     {
         // Arrange
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();
@@ -242,7 +242,7 @@ public class FileUpdateServiceTests : IDisposable
     {
         // Arrange
         File.WriteAllText(_removedFilesManifestPath, "[]");
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();
@@ -259,7 +259,7 @@ public class FileUpdateServiceTests : IDisposable
         File.WriteAllText(fileToDelete, "content");
         File.WriteAllText(_removedFilesManifestPath, "[\"delete_me.txt\"]");
 
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();
@@ -274,7 +274,7 @@ public class FileUpdateServiceTests : IDisposable
     {
         // Arrange
         File.WriteAllText(_removedFilesManifestPath, "[\"nonexistent.txt\"]");
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();
@@ -290,7 +290,7 @@ public class FileUpdateServiceTests : IDisposable
         string absolutePath = Path.Combine(_testDirectory, "absolute.txt");
         string json = JsonConvert.SerializeObject(new[] { absolutePath });
         File.WriteAllText(_removedFilesManifestPath, json);
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();
@@ -305,7 +305,7 @@ public class FileUpdateServiceTests : IDisposable
         // Arrange
         string json = JsonConvert.SerializeObject(new[] { "..\\..\\escape.txt" });
         File.WriteAllText(_removedFilesManifestPath, json);
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();
@@ -319,7 +319,7 @@ public class FileUpdateServiceTests : IDisposable
     {
         // Arrange
         File.WriteAllText(_removedFilesManifestPath, "[]");
-        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory);
+        FileUpdateService service = new(_logger, _updateStagingDirectory, _removedFilesManifestPath, _testDirectory, Path.Combine(_testDirectory, "UpdateManifest.json"));
 
         // Act
         await service.DeleteRemovedFilesAsync();

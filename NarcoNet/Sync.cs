@@ -43,7 +43,9 @@ public static class Sync
                     return new KeyValuePair<string, List<string>>(syncPath.Path, []);
                 }
 
-                IEnumerable<string> query = remoteModFiles[syncPath.Path].Keys
+                IEnumerable<string> query = remoteModFiles[syncPath.Path]
+                    .Where(kvp => !kvp.Value.Directory)
+                    .Select(kvp => kvp.Key)
                     .Intersect(localPathFiles.Keys, StringComparer.OrdinalIgnoreCase);
 
                 if (!syncPath.Enabled)

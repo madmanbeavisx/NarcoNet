@@ -38,12 +38,14 @@ public sealed class UpdateProgressForm : Form
         string dataDirectory = Path.Combine(Environment.CurrentDirectory, NarcoNetConstants.DataDirectoryName);
         string updateDirectory = Path.Combine(dataDirectory, NarcoNetConstants.PendingUpdatesDirectoryName);
         string removedFilesPath = Path.Combine(dataDirectory, NarcoNetConstants.RemovedFilesFileName);
+        string updateManifestPath = Path.Combine(dataDirectory, NarcoNetConstants.UpdateManifestFileName);
 
         _fileUpdateService = new FileUpdateService(
             _logger,
             updateDirectory,
             removedFilesPath,
-            Environment.CurrentDirectory
+            Environment.CurrentDirectory,
+            updateManifestPath
         );
 
         InitializeUserInterface();

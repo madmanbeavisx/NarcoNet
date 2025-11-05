@@ -1,4 +1,5 @@
 ﻿using NarcoNet.Updater.Interfaces;
+using NarcoNet.Updater.Models;
 
 using Newtonsoft.Json;
 
@@ -13,6 +14,7 @@ public class FileUpdateService : IFileUpdateService
     private readonly string _removedFilesManifestPath;
     private readonly string _targetDirectory;
     private readonly string _updateStagingDirectory;
+    private readonly string _updateManifestPath;
 
     /// <summary>
     ///     Sets up the package handler with all the intel needed for the job.
@@ -21,17 +23,20 @@ public class FileUpdateService : IFileUpdateService
     /// <param name="updateStagingDirectory">The staging area where packages wait.</param>
     /// <param name="removedFilesManifestPath">The hit list - who's gotta go.</param>
     /// <param name="targetDirectory">The final destination for all packages.</param>
+    /// <param name="updateManifestPath">The operations manifest - what needs to be done.</param>
     public FileUpdateService(
         ILogger logger,
         string updateStagingDirectory,
         string removedFilesManifestPath,
-        string targetDirectory)
+        string targetDirectory,
+        string updateManifestPath)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _updateStagingDirectory = updateStagingDirectory ?? throw new ArgumentNullException(nameof(updateStagingDirectory));
         _removedFilesManifestPath =
             removedFilesManifestPath ?? throw new ArgumentNullException(nameof(removedFilesManifestPath));
         _targetDirectory = targetDirectory ?? throw new ArgumentNullException(nameof(targetDirectory));
+        _updateManifestPath = updateManifestPath ?? throw new ArgumentNullException(nameof(updateManifestPath));
     }
 
     /// <inheritdoc />
@@ -57,6 +62,14 @@ public class FileUpdateService : IFileUpdateService
     /// <inheritdoc />
     public async Task ApplyPendingUpdatesAsync(CancellationToken cancellationToken = default)
     {
+        // Check if we have a manifest file
+        if (File.Exists(_updateManifestPath))
+        {
+            await ApplyManifestOperationsAsync(cancellationToken);
+            return;
+        }
+
+        // Fall back to legacy file-based updates
         if (!HasPendingUpdates())
         {
             _logger.LogDebug("No pending updates in staging directory.");
@@ -299,6 +312,194 @@ public class FileUpdateService : IFileUpdateService
         catch (Exception ex)
         {
             _logger.LogException(ex, "Failed to clean empty directories");
+        }
+    }
+
+    /// <summary>
+    ///     Applies operations from the update manifest
+    /// </summary>
+    private async Task ApplyManifestOperationsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogDebug($"Reading update manifest: {_updateManifestPath}");
+
+            string json = await Task.Run(() => File.ReadAllText(_updateManifestPath), cancellationToken);
+            UpdateManifest? manifest = JsonConvert.DeserializeObject<UpdateManifest>(json);
+
+            if (manifest == null || manifest.Operations.Count == 0)
+            {
+                _logger.LogDebug("Update manifest is empty or invalid");
+                await DeleteManifestAsync(cancellationToken);
+                return;
+            }
+
+            _logger.LogDebug($"Applying {manifest.Operations.Count} operations from manifest");
+
+            foreach (UpdateOperation operation in manifest.Operations)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await ApplyOperationAsync(operation, cancellationToken);
+            }
+
+            await CleanupStagingDirectoryAsync(cancellationToken);
+            await DeleteManifestAsync(cancellationToken);
+
+            _logger.LogDebug("All manifest operations completed");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogException(ex, "Failed to apply manifest operations");
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Applies a single operation from the manifest
+    /// </summary>
+    private async Task ApplyOperationAsync(UpdateOperation operation, CancellationToken cancellationToken)
+    {
+        try
+        {
+            switch (operation.Type)
+            {
+                case OperationType.CopyFile:
+                    await ApplyCopyFileOperationAsync(operation, cancellationToken);
+                    break;
+
+                case OperationType.CreateDirectory:
+                    await ApplyCreateDirectoryOperationAsync(operation, cancellationToken);
+                    break;
+
+                case OperationType.DeleteFile:
+                    await ApplyDeleteFileOperationAsync(operation, cancellationToken);
+                    break;
+
+                case OperationType.MoveFile:
+                    await ApplyMoveFileOperationAsync(operation, cancellationToken);
+                    break;
+
+                case OperationType.ExtractArchive:
+                    _logger.LogWarning($"ExtractArchive operation not yet implemented: {operation.Destination}");
+                    break;
+
+                case OperationType.DecryptFile:
+                    _logger.LogWarning($"DecryptFile operation not yet implemented: {operation.Destination}");
+                    break;
+
+                default:
+                    _logger.LogWarning($"Unknown operation type: {operation.Type}");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogException(ex, $"Failed to apply operation {operation.Type}: {operation.Destination}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Copies a file from staging to target
+    /// </summary>
+    private async Task ApplyCopyFileOperationAsync(UpdateOperation operation, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(operation.Source) || string.IsNullOrEmpty(operation.Destination))
+        {
+            throw new InvalidOperationException("CopyFile operation requires both Source and Destination");
+        }
+
+        string sourceFilePath = Path.Combine(_updateStagingDirectory, operation.Source);
+        string targetFilePath = Path.Combine(_targetDirectory, operation.Destination);
+
+        _logger.LogDebug($"Copying file: {operation.Source} -> {operation.Destination}");
+
+        string? targetDirectoryPath = Path.GetDirectoryName(targetFilePath);
+        if (!string.IsNullOrEmpty(targetDirectoryPath) && !Directory.Exists(targetDirectoryPath))
+        {
+            Directory.CreateDirectory(targetDirectoryPath);
+        }
+
+        await Task.Run(() => File.Copy(sourceFilePath, targetFilePath, true), cancellationToken);
+
+        _logger.LogDebug($"File copied: {operation.Destination}");
+    }
+
+    /// <summary>
+    ///     Creates a directory at the target location
+    /// </summary>
+    private async Task ApplyCreateDirectoryOperationAsync(UpdateOperation operation, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(operation.Destination))
+        {
+            throw new InvalidOperationException("CreateDirectory operation requires Destination");
+        }
+
+        string targetDirectoryPath = Path.Combine(_targetDirectory, operation.Destination);
+
+        _logger.LogDebug($"Creating directory: {operation.Destination}");
+
+        await Task.Run(() => Directory.CreateDirectory(targetDirectoryPath), cancellationToken);
+
+        _logger.LogDebug($"Directory created: {operation.Destination}");
+    }
+
+    /// <summary>
+    ///     Deletes a file from the target location
+    /// </summary>
+    private async Task ApplyDeleteFileOperationAsync(UpdateOperation operation, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(operation.Destination))
+        {
+            throw new InvalidOperationException("DeleteFile operation requires Destination");
+        }
+
+        await DeleteSingleFileAsync(operation.Destination, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Moves a file from one location to another
+    /// </summary>
+    private async Task ApplyMoveFileOperationAsync(UpdateOperation operation, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(operation.Source) || string.IsNullOrEmpty(operation.Destination))
+        {
+            throw new InvalidOperationException("MoveFile operation requires both Source and Destination");
+        }
+
+        string sourceFilePath = Path.Combine(_targetDirectory, operation.Source);
+        string targetFilePath = Path.Combine(_targetDirectory, operation.Destination);
+
+        _logger.LogDebug($"Moving file: {operation.Source} -> {operation.Destination}");
+
+        string? targetDirectoryPath = Path.GetDirectoryName(targetFilePath);
+        if (!string.IsNullOrEmpty(targetDirectoryPath) && !Directory.Exists(targetDirectoryPath))
+        {
+            Directory.CreateDirectory(targetDirectoryPath);
+        }
+
+        await Task.Run(() => File.Move(sourceFilePath, targetFilePath), cancellationToken);
+
+        _logger.LogDebug($"File moved: {operation.Destination}");
+    }
+
+    /// <summary>
+    ///     Deletes the update manifest file
+    /// </summary>
+    private async Task DeleteManifestAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogDebug($"Deleting update manifest: {_updateManifestPath}");
+
+            await Task.Run(() => File.Delete(_updateManifestPath), cancellationToken);
+
+            _logger.LogDebug("Update manifest deleted");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogException(ex, "Failed to delete update manifest");
+            // Not a big deal - keep moving
         }
     }
 }
