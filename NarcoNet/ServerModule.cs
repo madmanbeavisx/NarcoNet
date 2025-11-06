@@ -29,14 +29,15 @@ public class ServerModule(Version pluginVersion)
         }
     }
 
-    internal async Task DownloadFile(string file, string path, SemaphoreSlim limiter, CancellationToken cancellationToken)
+    internal async Task DownloadFile(string file, string path, SemaphoreSlim limiter, CancellationToken cancellationToken, string? localPath = null)
     {
         if (cancellationToken.IsCancellationRequested)
         {
             return;
         }
 
-        string downloadPath = Path.Combine(path, file);
+        // Use localPath if provided, otherwise use file (for backward compatibility)
+        string downloadPath = Path.Combine(path, localPath ?? file);
 
         VFS.CreateDirectory(downloadPath.GetDirectory());
 
@@ -109,12 +110,12 @@ public class ServerModule(Version pluginVersion)
         return Json.Deserialize<List<string>>(await GetJsonTask("/narconet/exclusions"));
     }
 
-    internal async Task<Dictionary<string, Dictionary<string, string>>> GetRemoteHashes(List<SyncPath> paths)
+    internal async Task<Dictionary<string, Dictionary<string, ModFile>>> GetRemoteHashes(List<SyncPath> paths)
     {
         if (paths.Count == 0)
         {
             NarcoPlugin.Logger.LogWarning("No sync paths provided");
-            return new Dictionary<string, Dictionary<string, string>>();
+            return new Dictionary<string, Dictionary<string, ModFile>>();
         }
 
         try
@@ -123,11 +124,11 @@ public class ServerModule(Version pluginVersion)
                 paths.Select(path => Uri.EscapeDataString(path.Path.Replace(@"\", "/"))))}");
 
             var rawData =
-                Json.Deserialize<Dictionary<string, Dictionary<string, string>>>(json);
+                Json.Deserialize<Dictionary<string, Dictionary<string, ModFile>>>(json);
 
             return rawData.ToDictionary(
                 item => item.Key,
-                item => new Dictionary<string, string>(item.Value, StringComparer.OrdinalIgnoreCase),
+                item => new Dictionary<string, ModFile>(item.Value, StringComparer.OrdinalIgnoreCase),
                 StringComparer.OrdinalIgnoreCase);
         }
         catch (Exception e)

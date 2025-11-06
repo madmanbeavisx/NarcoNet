@@ -9,6 +9,11 @@ public class UpdateManifest
     /// List of operations to perform
     /// </summary>
     public List<UpdateOperation> Operations { get; set; } = [];
+
+    /// <summary>
+    /// Remote sync data to write to PreviousSync.json after successful update
+    /// </summary>
+    public Dictionary<string, Dictionary<string, object>>? RemoteSyncData { get; set; }
 }
 
 /// <summary>

@@ -67,14 +67,15 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
             Directory.CreateDirectory(pendingUpdatesDir);
         }
 
-        // Create directories first
-        foreach (SyncPath syncPath in enabledSyncPaths)
+        // Create directories first (only for non-restart-required paths)
+        foreach (SyncPath syncPath in enabledSyncPaths.Where(sp => !sp.RestartRequired))
         {
             foreach (string dir in directoriesToCreate[syncPath.Path])
             {
                 try
                 {
-                    Directory.CreateDirectory(dir);
+                    string fullPath = Path.Combine(Directory.GetCurrentDirectory(), dir);
+                    Directory.CreateDirectory(fullPath);
                 }
                 catch (Exception e)
                 {
@@ -98,13 +99,33 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
             .SelectMany(syncPath =>
                 filesToDownload.TryGetValue(syncPath.Path, out List<string>? pathFilesToDownload)
                     ? pathFilesToDownload.Select(file =>
-                        serverModule.DownloadFile(
+                    {
+                        // For restart-required files, download to PendingUpdates with normalized path
+                        if (syncPath.RestartRequired)
+                        {
+                            // Strip ..\ prefix for local storage in PendingUpdates
+                            string localPath = file.StartsWith("..\\", StringComparison.OrdinalIgnoreCase)
+                                ? file.Substring(3)
+                                : file;
+
+                            // Still request the original file path from server
+                            return serverModule.DownloadFile(
+                                file,
+                                pendingUpdatesDir,
+                                limiter,
+                                cancellationToken,
+                                localPath
+                            );
+                        }
+
+                        // For non-restart files, download directly to current directory
+                        return serverModule.DownloadFile(
                             file,
-                            syncPath.RestartRequired ? pendingUpdatesDir : Directory.GetCurrentDirectory(),
+                            Directory.GetCurrentDirectory(),
                             limiter,
                             cancellationToken
-                        )
-                    )
+                        );
+                    })
                     : []
             )
             .ToList();
@@ -227,12 +248,22 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         SyncPathFileList removedFiles,
         List<SyncPath> enabledSyncPaths,
         bool deleteRemovedFiles,
-        string pendingUpdatesDir)
+        string pendingUpdatesDir,
+        SyncPathModFiles remoteModFiles)
     {
-        UpdateManifest manifest = new();
+        UpdateManifest manifest = new()
+        {
+            RemoteSyncData = remoteModFiles.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value.ToDictionary(
+                    fileKvp => fileKvp.Key,
+                    fileKvp => (object)fileKvp.Value
+                )
+            )
+        };
 
-        // Add directory creation operations
-        foreach (SyncPath syncPath in enabledSyncPaths)
+        // Add directory creation operations (only for restart-required paths)
+        foreach (SyncPath syncPath in enabledSyncPaths.Where(sp => sp.RestartRequired))
         {
             foreach (string dir in directoriesToCreate[syncPath.Path])
             {
@@ -249,11 +280,18 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         {
             foreach (string file in addedFiles[syncPath.Path].Concat(updatedFiles[syncPath.Path]))
             {
+                // File paths contain ..\ because they're relative to NarcoNet_Data
+                // Source is relative to PendingUpdates, Destination is relative to game root
+                // Both need the ..\ stripped since updater works from game root
+                string normalizedPath = file.StartsWith("..\\", StringComparison.OrdinalIgnoreCase)
+                    ? file.Substring(3)
+                    : file;
+
                 manifest.Operations.Add(new UpdateOperation
                 {
                     Type = OperationType.CopyFile,
-                    Source = file,
-                    Destination = file
+                    Source = normalizedPath,  // Relative to PendingUpdates
+                    Destination = normalizedPath  // Relative to game root
                 });
             }
         }

@@ -89,5 +89,6 @@ public interface IClientSyncService
         SyncPathFileList removedFiles,
         List<SyncPath> enabledSyncPaths,
         bool deleteRemovedFiles,
-        string pendingUpdatesDir);
+        string pendingUpdatesDir,
+        SyncPathModFiles remoteModFiles);
 }

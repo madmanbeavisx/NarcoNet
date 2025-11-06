@@ -20,20 +20,28 @@
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(SolutionDir)' != '' AND '$(SolutionDir)' != '*Undefined*'">
         <PropertyGroup>
-            <BuildOutputDir>$(SolutionDir)Build\SPT</BuildOutputDir>
+            <BuildOutputDir>$(SolutionDir)Build</BuildOutputDir>
         </PropertyGroup>
 
         <ItemGroup>
             <UpdaterFiles Include="$(TargetDir)NarcoNet.Updater.exe"/>
             <UpdaterFiles Include="$(TargetDir)Newtonsoft.Json.dll"/>
-            <UpdaterFiles Include="$(TargetDir)NarcoNet.Utilities.dll"/>
+        </ItemGroup>
+
+        <ItemGroup>
+            <UtilitiesFiles Include="$(TargetDir)NarcoNet.Utilities.dll"/>
         </ItemGroup>
 
         <!-- Create output directory structure -->
         <MakeDir Directories="$(BuildOutputDir)"/>
+        <MakeDir Directories="$(BuildOutputDir)\BepInEx\plugins\MadManBeavis-NarcoNet"/>
 
-        <!-- Copy updater and dependencies to SPT Build directory -->
+        <!-- Copy updater and dependencies to base Build directory -->
         <Copy SourceFiles="@(UpdaterFiles)" DestinationFolder="$(BuildOutputDir)"/>
+
+        <!-- Copy utilities to both locations -->
+        <Copy SourceFiles="@(UtilitiesFiles)" DestinationFolder="$(BuildOutputDir)"/>
+        <Copy SourceFiles="@(UtilitiesFiles)" DestinationFolder="$(BuildOutputDir)\BepInEx\plugins\MadManBeavis-NarcoNet"/>
 
         <Message Text="Updater EXE and dependencies copied to: $(BuildOutputDir)" Importance="high"/>
     </Target>

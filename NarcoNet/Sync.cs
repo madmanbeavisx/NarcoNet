@@ -57,7 +57,12 @@ public static class Sync
                     );
                 }
 
-                query = query.Where(file => remoteModFiles[syncPath.Path][file].Hash != localPathFiles[file].Hash);
+                query = query.Where(file =>
+                {
+                    // Find the actual key in localPathFiles (case-insensitive)
+                    string? localKey = localPathFiles.Keys.FirstOrDefault(k => string.Equals(k, file, StringComparison.OrdinalIgnoreCase));
+                    return localKey == null || remoteModFiles[syncPath.Path][file].Hash != localPathFiles[localKey].Hash;
+                });
 
                 return new KeyValuePair<string, List<string>>(syncPath.Path, query.ToList());
             })
@@ -167,11 +172,13 @@ public static class Sync
 
         foreach (SyncPath syncPath in syncPaths)
         {
-            string path = Path.Combine(basePath, syncPath.Path);
+            string narcoNetDataPath = Path.Combine(basePath, "NarcoNet_Data");
+            string path = Path.GetFullPath(Path.Combine(narcoNetDataPath, syncPath.Path));
 
+            List<Regex> exclusionsToUse = [.. remoteExclusions, .. (syncPath.Enforced ? [] : localExclusions)];
             results[syncPath.Path] = (
                 await Task.WhenAll(
-                    GetFilesInDirectory(basePath, path, [.. remoteExclusions, .. syncPath.Enforced ? [] : localExclusions])
+                    GetFilesInDirectory(basePath, path, exclusionsToUse)
                         .Where(file => !processedFiles.Contains(file))
                         .AsParallel()
                         .Select(async file =>
@@ -181,7 +188,12 @@ public static class Sync
                                 limitOpenFiles.Release();
 
                                 processedFiles.Add(file);
-                                return new KeyValuePair<string, ModFile>(file.Replace($"{basePath}\\", ""), modFile);
+                                // Convert absolute path back to relative path matching syncPath.Path format
+                                // Replace the game root path with empty string, then prepend ".."
+                                // e.g., C:\SPT\BepInEx\plugins\file.dll -> ..\\BepInEx\\plugins\\file.dll
+                                string pathFromGameRoot = file.Replace($"{basePath}\\", "");
+                                string relativePath = "..\\" + pathFromGameRoot;
+                                return new KeyValuePair<string, ModFile>(relativePath, modFile);
                             }
                         )
                 )

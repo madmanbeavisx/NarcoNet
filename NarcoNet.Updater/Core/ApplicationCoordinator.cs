@@ -29,6 +29,14 @@ public sealed class ApplicationCoordinator
         _uiService = new UserInterfaceService();
         _processMonitor = new ProcessMonitorService(_logger);
 
+        // Find the SPT game directory (look for EscapeFromTarkov.exe)
+        string workingDirectory = FindGameDirectory();
+        if (workingDirectory != Directory.GetCurrentDirectory())
+        {
+            _logger.LogDebug($"Changing working directory to: {workingDirectory}");
+            Directory.SetCurrentDirectory(workingDirectory);
+        }
+
         // Set up the package handlers
         string dataDirectory = Path.Combine(
             Directory.GetCurrentDirectory(),
@@ -50,12 +58,18 @@ public sealed class ApplicationCoordinator
             NarcoNetConstants.UpdateManifestFileName
         );
 
+        string previousSyncPath = Path.Combine(
+            dataDirectory,
+            NarcoNetConstants.PreviousSyncFileName
+        );
+
         _fileUpdateService = new FileUpdateService(
             _logger,
             updateDirectory,
             removedFilesPath,
             Directory.GetCurrentDirectory(),
-            updateManifestPath
+            updateManifestPath,
+            previousSyncPath
         );
     }
 
@@ -213,6 +227,33 @@ public sealed class ApplicationCoordinator
         }
 
         _logger.LogDebug("Target process exited, proceeding with update");
+    }
+
+    /// <summary>
+    ///     Finds the SPT game directory by looking for EscapeFromTarkov.exe
+    /// </summary>
+    private string FindGameDirectory()
+    {
+        string currentDir = Directory.GetCurrentDirectory();
+
+        // Check current directory first
+        if (File.Exists(Path.Combine(currentDir, "EscapeFromTarkov.exe")))
+        {
+            return currentDir;
+        }
+
+        // Check subdirectories (look for SPT/SPT structure)
+        string[] subdirs = Directory.GetDirectories(currentDir);
+        foreach (string subdir in subdirs)
+        {
+            if (File.Exists(Path.Combine(subdir, "EscapeFromTarkov.exe")))
+            {
+                return subdir;
+            }
+        }
+
+        // If not found, return current directory and let validation handle it
+        return currentDir;
     }
 
     /// <summary>

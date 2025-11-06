@@ -15,6 +15,7 @@ public class FileUpdateService : IFileUpdateService
     private readonly string _targetDirectory;
     private readonly string _updateStagingDirectory;
     private readonly string _updateManifestPath;
+    private readonly string _previousSyncPath;
 
     /// <summary>
     ///     Sets up the package handler with all the intel needed for the job.
@@ -24,12 +25,14 @@ public class FileUpdateService : IFileUpdateService
     /// <param name="removedFilesManifestPath">The hit list - who's gotta go.</param>
     /// <param name="targetDirectory">The final destination for all packages.</param>
     /// <param name="updateManifestPath">The operations manifest - what needs to be done.</param>
+    /// <param name="previousSyncPath">The previous sync data path.</param>
     public FileUpdateService(
         ILogger logger,
         string updateStagingDirectory,
         string removedFilesManifestPath,
         string targetDirectory,
-        string updateManifestPath)
+        string updateManifestPath,
+        string previousSyncPath)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _updateStagingDirectory = updateStagingDirectory ?? throw new ArgumentNullException(nameof(updateStagingDirectory));
@@ -37,11 +40,19 @@ public class FileUpdateService : IFileUpdateService
             removedFilesManifestPath ?? throw new ArgumentNullException(nameof(removedFilesManifestPath));
         _targetDirectory = targetDirectory ?? throw new ArgumentNullException(nameof(targetDirectory));
         _updateManifestPath = updateManifestPath ?? throw new ArgumentNullException(nameof(updateManifestPath));
+        _previousSyncPath = previousSyncPath ?? throw new ArgumentNullException(nameof(previousSyncPath));
     }
 
     /// <inheritdoc />
     public bool HasPendingUpdates()
     {
+        // Check if we have a manifest file
+        if (File.Exists(_updateManifestPath))
+        {
+            return true;
+        }
+
+        // Fall back to checking staging directory for legacy updates
         return Directory.Exists(_updateStagingDirectory) &&
                Directory.EnumerateFiles(_updateStagingDirectory, "*", SearchOption.AllDirectories).Any();
     }
@@ -51,7 +62,8 @@ public class FileUpdateService : IFileUpdateService
     {
         if (!HasPendingUpdates())
         {
-            return [
+            return
+            [
             ];
         }
 
@@ -342,6 +354,7 @@ public class FileUpdateService : IFileUpdateService
                 await ApplyOperationAsync(operation, cancellationToken);
             }
 
+            await UpdatePreviousSyncAsync(manifest, cancellationToken);
             await CleanupStagingDirectoryAsync(cancellationToken);
             await DeleteManifestAsync(cancellationToken);
 
@@ -351,6 +364,32 @@ public class FileUpdateService : IFileUpdateService
         {
             _logger.LogException(ex, "Failed to apply manifest operations");
             throw;
+        }
+    }
+
+    /// <summary>
+    ///     Updates the PreviousSync.json file from the manifest's RemoteSyncData
+    /// </summary>
+    private async Task UpdatePreviousSyncAsync(UpdateManifest manifest, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (manifest?.RemoteSyncData != null)
+            {
+                _logger.LogDebug("Updating PreviousSync.json with remote sync data");
+                string previousSyncJson = JsonConvert.SerializeObject(manifest.RemoteSyncData);
+                await Task.Run(() => File.WriteAllText(_previousSyncPath, previousSyncJson), cancellationToken);
+                _logger.LogDebug("PreviousSync.json updated successfully");
+            }
+            else
+            {
+                _logger.LogWarning("No RemoteSyncData found in manifest");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogException(ex, "Failed to update PreviousSync.json");
+            // Don't throw - this isn't critical enough to fail the whole update
         }
     }
 
@@ -468,18 +507,21 @@ public class FileUpdateService : IFileUpdateService
             throw new InvalidOperationException("MoveFile operation requires both Source and Destination");
         }
 
-        string sourceFilePath = Path.Combine(_targetDirectory, operation.Source);
-        string targetFilePath = Path.Combine(_targetDirectory, operation.Destination);
-
-        _logger.LogDebug($"Moving file: {operation.Source} -> {operation.Destination}");
-
-        string? targetDirectoryPath = Path.GetDirectoryName(targetFilePath);
-        if (!string.IsNullOrEmpty(targetDirectoryPath) && !Directory.Exists(targetDirectoryPath))
+        if (operation.Source != null && operation.Destination != null)
         {
-            Directory.CreateDirectory(targetDirectoryPath);
-        }
+            string sourceFilePath = Path.Combine(_targetDirectory, operation.Source);
+            string targetFilePath = Path.Combine(_targetDirectory, operation.Destination);
 
-        await Task.Run(() => File.Move(sourceFilePath, targetFilePath), cancellationToken);
+            _logger.LogDebug($"Moving file: {operation.Source} -> {operation.Destination}");
+
+            string? targetDirectoryPath = Path.GetDirectoryName(targetFilePath);
+            if (!string.IsNullOrEmpty(targetDirectoryPath) && !Directory.Exists(targetDirectoryPath))
+            {
+                Directory.CreateDirectory(targetDirectoryPath);
+            }
+
+            await Task.Run(() => File.Move(sourceFilePath, targetFilePath), cancellationToken);
+        }
 
         _logger.LogDebug($"File moved: {operation.Destination}");
     }

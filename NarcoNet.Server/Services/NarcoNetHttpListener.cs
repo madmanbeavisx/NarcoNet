@@ -265,23 +265,14 @@ public class NarcoNetHttpListener(
 
             Dictionary<string, Dictionary<string, ModFile>> hashResults = await syncService.HashModFilesAsync(pathsToHash, _config, context.RequestAborted);
 
-            // Convert ModFile objects to just hash strings for client
-            Dictionary<string, Dictionary<string, string>> hashes = hashResults.ToDictionary(
-                kvp => kvp.Key,
-                kvp => kvp.Value.ToDictionary(
-                    fileKvp => fileKvp.Key,
-                    fileKvp => fileKvp.Value.Hash
-                )
-            );
-
             // Log total file counts per path
-            foreach (var pathHash in hashes)
+            foreach (var pathHash in hashResults)
             {
                 logger.LogDebug("Path '{Path}' has {Count} files",
                     pathHash.Key, pathHash.Value.Count);
             }
 
-            json = JsonSerializer.Serialize(hashes);
+            json = JsonSerializer.Serialize(hashResults);
         }
 
         byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);

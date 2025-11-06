@@ -65,7 +65,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -105,7 +106,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -151,7 +153,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -190,7 +193,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -228,7 +232,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -285,7 +290,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -326,7 +332,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -353,7 +360,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act
@@ -376,7 +384,8 @@ public class ManifestOperationTests : IDisposable
             _updateStagingDirectory,
             _removedFilesManifestPath,
             _testDirectory,
-            _updateManifestPath
+            _updateManifestPath,
+            Path.Combine(_testDirectory, "PreviousSync.json")
         );
 
         // Act

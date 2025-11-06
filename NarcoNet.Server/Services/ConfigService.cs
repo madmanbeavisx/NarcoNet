@@ -83,6 +83,12 @@ public class ConfigService
                                                - ../BepInEx/plugins/spt
                                                - ../BepInEx/patchers/spt-prepatch.dll
 
+                                               # NarcoNet internal (synced via built-in paths, excluded from user sync paths)
+                                               # Note: These exclusions are automatically added but shown here for reference
+                                               - NarcoNet.Updater.exe
+                                               - ../BepInEx/plugins/MadManBeavis-NarcoNet/**
+                                               - ../BepInEx/patchers/MadManBeavis-NarcoNet-Patcher.dll
+
                                                # Common client mod data folders - in game folder
                                                - ../BepInEx/plugins/DanW-SPTQuestingBots/log
                                                - ../BepInEx/plugins/Fika.Headless.dll
@@ -98,9 +104,6 @@ public class ConfigService
                                                - user/mods/zz_guiltyman-addmissingquestweaponrequirements/log.log
                                                - user/mods/zz_guiltyman-addmissingquestweaponrequirements/user/logs
                                                - user/mods/acidphantasm-progressivebotsystem/logs
-
-                                               # NarcoNet internal (synced via built-in paths)
-                                               - ../BepInEx/patchers/MadManBeavis-NarcoNet-Patcher.dll
 
                                                # Admin/Dev exclusions (use .nosync marker files)
                                                - "**/*.nosync"              # Any file ending in .nosync
@@ -198,25 +201,18 @@ public class ConfigService
         ValidateConfig(rawSyncPaths, exclusions, configPath);
 
         // Build the final config with built-in sync paths
-        var syncPaths = new List<SyncPath>
+        // NOTE: Built-in sync paths are DISABLED to prevent self-update loops
+        // NarcoNet components should be updated manually or through a separate mechanism
+        var syncPaths = new List<SyncPath>();
+
+        // Add built-in exclusions to prevent NarcoNet components from being synced via user-configured paths
+        var builtInExclusions = new List<string>
         {
-            new(
-                Path: "NarcoNet.Updater.exe",
-                Name: "(Builtin) NarcoNet Updater",
-                Enabled: true,
-                Enforced: true,
-                Silent: true,
-                RestartRequired: false
-            ),
-            new(
-                Path: "../BepInEx/plugins/MadManBeavis-NarcoNet",
-                Name: "(Builtin) NarcoNet Plugin",
-                Enabled: true,
-                Enforced: true,
-                Silent: true,
-                RestartRequired: true
-            )
+            "NarcoNet.Updater.exe",
+            "../BepInEx/plugins/MadManBeavis-NarcoNet/**",
+            "../BepInEx/patchers/MadManBeavis-NarcoNet-Patcher.dll"
         };
+        exclusions = exclusions.Concat(builtInExclusions).Distinct().ToList();
 
         // Only add enabled or enforced sync paths
         var filteredPaths = rawSyncPaths.Where(sp => sp.Enabled || sp.Enforced).ToList();

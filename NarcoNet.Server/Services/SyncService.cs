@@ -68,20 +68,7 @@ public class SyncService
             }
 
             List<string> subFiles = await GetFilesInDirectoryAsync(baseDir, subDirPath, config);
-
-            // Add empty directories
-            if (subDir.GetFiles().Length == 0 && subDir.GetDirectories().Length == 0)
-            {
-                files.Add(subDirPath);
-            }
-
             files.AddRange(subFiles);
-        }
-
-        // Add empty directories
-        if (dirInfo.GetFiles().Length == 0 && dirInfo.GetDirectories().Length == 0)
-        {
-            files.Add(dir);
         }
 
         return files;

@@ -22,6 +22,7 @@ public static class NarcoNetConstants
     public const string LogFileName = "NarcoNet.log";
     public const string RemovedFilesFileName = "RemovedFiles.json";
     public const string UpdateManifestFileName = "UpdateManifest.json";
+    public const string PreviousSyncFileName = "PreviousSync.json";
 
     // Updater
     public const string UpdaterExecutableName = "NarcoNet.Updater.exe";

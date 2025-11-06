@@ -277,6 +277,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
         SyncPathFileList directoriesToCreate)
     {
         _uiService.HideAllWindows();
+        
 
         if (!_configService.IsHeadless())
         {
@@ -306,21 +307,26 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
 
             if (!_cts.IsCancellationRequested)
             {
-                _syncService.WriteNarcoNetData(_remoteModFiles, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value);
-                _syncService.WriteUpdateManifest(_addedFiles, _updatedFiles, _createdDirectories, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value, PendingUpdatesDir);
-
                 if (NoRestartMode)
                 {
+                    // Only write sync data if no restart is required (updates were applied immediately)
+                    _syncService.WriteNarcoNetData(_remoteModFiles, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value);
                     Directory.Delete(PendingUpdatesDir, true);
                     _pluginFinished = true;
                 }
-                else if (!_configService.IsHeadless())
-                {
-                    _uiService.ShowRestartWindow(StartUpdaterProcess);
-                }
                 else
                 {
-                    StartUpdaterProcess();
+                    // Write the update manifest for the updater to process
+                    _syncService.WriteUpdateManifest(_addedFiles, _updatedFiles, _createdDirectories, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value, PendingUpdatesDir, _remoteModFiles);
+
+                    if (!_configService.IsHeadless())
+                    {
+                        _uiService.ShowRestartWindow(StartUpdaterProcess);
+                    }
+                    else
+                    {
+                        StartUpdaterProcess();
+                    }
                 }
             }
         }
@@ -364,7 +370,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             options.Add("--silent");
         }
 
-        Logger.LogDebug($"Starting updater with options: {string.Join(" ", options)} {GetCurrentProcess().Id}");
+        Logger.LogInfo($"Starting updater with options: {string.Join(" ", options)} {GetCurrentProcess().Id} with executable at {UpdaterPath}");
         ProcessStartInfo updaterStartInfo = new()
         {
             FileName = UpdaterPath,
@@ -551,19 +557,19 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
             VFS.WriteTextFile(LocalHashesPath, Json.Serialize(localModFiles));
 
             Logger.LogDebug("Requesting remote hashes...");
-            Task<Dictionary<string, Dictionary<string, string>>> remoteHashesTask =
+            Task<Dictionary<string, Dictionary<string, ModFile>>> remoteHashesTask =
                 _server.GetRemoteHashes(EnabledSyncPaths);
             yield return new WaitUntil(() => remoteHashesTask is { IsCompleted: true });
             try
             {
-                Dictionary<string, Dictionary<string, string>>? remoteHashes = remoteHashesTask.Result;
+                Dictionary<string, Dictionary<string, ModFile>>? remoteHashes = remoteHashesTask.Result;
                 if (remoteHashes == null)
                 {
                     Logger.LogError("Remote hashes task returned null");
                     yield break;
                 }
 
-                _remoteModFiles = _initService.BuildRemoteModFiles(EnabledSyncPaths, remoteHashes, _localExclusions);
+                _remoteModFiles = remoteHashes;
             }
             catch (Exception e)
             {
