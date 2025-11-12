@@ -22,7 +22,8 @@ namespace NarcoNet.Server.Services;
 public class NarcoNetHttpListener(
     ILogger<NarcoNetHttpListener> logger,
     SyncService syncService,
-    MimeTypeHelper mimeTypeHelper)
+    MimeTypeHelper mimeTypeHelper,
+    ChangeLogService changeLogService)
     : IHttpListener
 {
     // Fallback data for older client versions
@@ -125,6 +126,14 @@ public class NarcoNetHttpListener(
             {
                 await HandleGetHashes(context);
             }
+            else if (path == "/narconet/changes")
+            {
+                await HandleGetChanges(context);
+            }
+            else if (path == "/narconet/sequence")
+            {
+                await HandleGetCurrentSequence(context);
+            }
             else if (path.StartsWith("/narconet/fetch/"))
             {
                 await HandleFetchModFile(context);
@@ -220,47 +229,25 @@ public class NarcoNetHttpListener(
         {
             StringValues pathsParam = context.Request.Query["path"];
 
-            Console.WriteLine($"[NarcoNet HttpListener] Hash request received, pathsParam.Count={pathsParam.Count}");
-            Console.WriteLine($"[NarcoNet HttpListener] Total sync paths in config: {_config!.SyncPaths.Count}");
-            foreach (var sp in _config.SyncPaths)
-            {
-                Console.WriteLine($"  - {sp.Path} (Enabled={sp.Enabled}, Enforced={sp.Enforced})");
-            }
-
             // Only hash enabled or enforced sync paths
             List<SyncPath> pathsToHash;
             if (pathsParam.Count > 0)
             {
                 // Client requested specific paths - only hash those (if enabled or enforced)
                 List<string?> requestedPaths = pathsParam.ToList();
-                Console.WriteLine($"[NarcoNet HttpListener] Client requested {requestedPaths.Count} specific paths:");
-                foreach (var rp in requestedPaths)
-                {
-                    Console.WriteLine($"  - '{rp}'");
-                }
-                logger.LogDebug("Client requested specific paths: {Paths}", string.Join(", ", requestedPaths));
+                logger.LogDebug("Client requested {Count} specific paths", requestedPaths.Count);
                 pathsToHash = _config!.SyncPaths
                     .Where(sp => (sp.Enabled || sp.Enforced) && requestedPaths.Contains(sp.Path))
                     .ToList();
-                Console.WriteLine($"[NarcoNet HttpListener] After filtering: {pathsToHash.Count} paths will be hashed");
-                foreach (var sp in pathsToHash)
-                {
-                    Console.WriteLine($"  - {sp.Path}");
-                }
-                logger.LogDebug("Filtered to {Count} enabled/enforced paths: {Paths}",
-                    pathsToHash.Count, string.Join(", ", pathsToHash.Select(p => p.Path)));
+                logger.LogDebug("Hashing {Count} enabled/enforced paths", pathsToHash.Count);
             }
             else
             {
                 // No specific paths requested - hash all enabled/enforced paths
-                Console.WriteLine($"[NarcoNet HttpListener] No specific paths requested, hashing all enabled/enforced");
-                logger.LogDebug("No specific paths requested, hashing all enabled/enforced paths");
+                logger.LogDebug("Hashing all enabled/enforced sync paths");
                 pathsToHash = _config!.SyncPaths
                     .Where(sp => sp.Enabled || sp.Enforced)
                     .ToList();
-                Console.WriteLine($"[NarcoNet HttpListener] Will hash {pathsToHash.Count} paths");
-                logger.LogDebug("Found {Count} enabled/enforced paths: {Paths}",
-                    pathsToHash.Count, string.Join(", ", pathsToHash.Select(p => p.Path)));
             }
 
             Dictionary<string, Dictionary<string, ModFile>> hashResults = await syncService.HashModFilesAsync(pathsToHash, _config, context.RequestAborted);
@@ -276,6 +263,70 @@ public class NarcoNetHttpListener(
         }
 
         byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
+        context.Response.ContentType = "application/json";
+        context.Response.StatusCode = 200;
+        await context.Response.Body.WriteAsync(jsonBytes);
+        await context.Response.StartAsync();
+        await context.Response.CompleteAsync();
+    }
+
+    private async Task HandleGetChanges(HttpContext context)
+    {
+        // Get sequence number from query parameter
+        if (!context.Request.Query.TryGetValue("since", out StringValues sinceParam) || 
+            !long.TryParse(sinceParam.FirstOrDefault(), out long sinceSequence))
+        {
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsync("NarcoNet: Missing or invalid 'since' query parameter");
+            return;
+        }
+
+        logger.LogDebug("Client requested changes since sequence {Sequence}", sinceSequence);
+
+        // Get changes from changelog service
+        List<FileChangeEntry> changes = changeLogService.GetChangesSince(sinceSequence);
+        long currentSequence = await changeLogService.GetCurrentSequenceAsync(context.RequestAborted);
+
+        var response = new
+        {
+            CurrentSequence = currentSequence,
+            Changes = changes.Select(c => new
+            {
+                c.SequenceNumber,
+                Operation = c.Operation.ToString(),
+                c.FilePath,
+                c.Hash,
+                c.Timestamp,
+                c.FileSize,
+                c.LastModified
+            }).ToList()
+        };
+
+        string json = JsonSerializer.Serialize(response);
+        byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
+
+        context.Response.ContentType = "application/json";
+        context.Response.StatusCode = 200;
+        await context.Response.Body.WriteAsync(jsonBytes);
+        await context.Response.StartAsync();
+        await context.Response.CompleteAsync();
+
+        logger.LogDebug("Returned {Count} changes to client (current sequence: {Current})", 
+            changes.Count, currentSequence);
+    }
+
+    private async Task HandleGetCurrentSequence(HttpContext context)
+    {
+        long currentSequence = await changeLogService.GetCurrentSequenceAsync(context.RequestAborted);
+
+        var response = new
+        {
+            CurrentSequence = currentSequence
+        };
+
+        string json = JsonSerializer.Serialize(response);
+        byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
+
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = 200;
         await context.Response.Body.WriteAsync(jsonBytes);

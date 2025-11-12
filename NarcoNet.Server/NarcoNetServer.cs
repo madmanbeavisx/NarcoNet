@@ -45,7 +45,8 @@ public record ModMetadata : AbstractModMetadata
 public class NarcoNetServer(
     ILogger<NarcoNetServer> logger,
     ConfigService configService,
-    NarcoNetHttpListener httpListener)
+    NarcoNetHttpListener httpListener,
+    SyncService syncService)
     : IPreSptLoadModAsync
 {
     private static bool _loadFailed;
@@ -65,6 +66,9 @@ public class NarcoNetServer(
 
             // Load configuration
             NarcoNetConfig config = await configService.LoadConfigAsync(modPath);
+
+            // Detect file changes since last startup
+            await syncService.DetectStartupChangesAsync(config.SyncPaths, config);
 
             // Check for files that will be synced to clients
             string updaterPath = Path.Combine(Directory.GetCurrentDirectory(), "NarcoNet.Updater.exe");

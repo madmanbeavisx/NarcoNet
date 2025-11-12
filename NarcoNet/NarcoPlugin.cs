@@ -6,6 +6,7 @@ using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using Comfort.Common;
 using EFT.UI;
+using NarcoNet.Models;
 using NarcoNet.Services;
 using NarcoNet.Utilities;
 using SPT.Common.Utils;
@@ -274,7 +275,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
     ///     Downloads and synchronizes mod files, showing progress UI
     /// </summary>
     private async Task SyncMods(SyncPathFileList filesToAdd, SyncPathFileList filesToUpdate,
-        SyncPathFileList directoriesToCreate)
+        SyncPathFileList directoriesToCreate, SyncPathFileList filesToRemove = null!)
     {
         _uiService.HideAllWindows();
         
@@ -296,6 +297,7 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 filesToAdd,
                 filesToUpdate,
                 directoriesToCreate,
+                filesToRemove ?? _removedFiles,
                 EnabledSyncPaths,
                 _configService.DeleteRemovedFiles.Value,
                 PendingUpdatesDir,
@@ -556,51 +558,179 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
 
             VFS.WriteTextFile(LocalHashesPath, Json.Serialize(localModFiles));
 
-            Logger.LogDebug("Requesting remote hashes...");
-            Task<Dictionary<string, Dictionary<string, ModFile>>> remoteHashesTask =
-                _server.GetRemoteHashes(EnabledSyncPaths);
-            yield return new WaitUntil(() => remoteHashesTask is { IsCompleted: true });
-            try
+            // Try incremental sync first
+            Logger.LogDebug("Checking for incremental sync support...");
+            ClientSyncState? syncState = _syncService.LoadSyncState();
+            bool useIncrementalSync = false;
+
+            if (syncState != null)
             {
-                Dictionary<string, Dictionary<string, ModFile>>? remoteHashes = remoteHashesTask.Result;
-                if (remoteHashes == null)
+                Logger.LogDebug($"Found sync state at sequence {syncState.LastSequence} from {syncState.LastSyncTime}");
+                
+                // Get current server sequence
+                Task<long> currentSeqTask = _server.GetCurrentSequence();
+                yield return new WaitUntil(() => currentSeqTask.IsCompleted);
+                
+                if (!currentSeqTask.IsFaulted && currentSeqTask.Result > syncState.LastSequence)
                 {
-                    Logger.LogError("Remote hashes task returned null");
+                    Logger.LogDebug($"Server has new changes (sequence {currentSeqTask.Result})");
+                    
+                    // Get incremental changes
+                    Task<ChangesResponse> changesTask = _server.GetChangesSince(syncState.LastSequence);
+                    yield return new WaitUntil(() => changesTask.IsCompleted);
+                    
+                    if (!changesTask.IsFaulted)
+                    {
+                        ChangesResponse changes = changesTask.Result;
+                        Logger.LogInfo($"Using incremental sync: {changes.Changes.Count} changes since last sync");
+                        
+                        // Apply incremental changes
+                        Task<(SyncPathFileList, SyncPathFileList, SyncPathFileList)> applyTask = 
+                            _syncService.ApplyIncrementalChangesAsync(changes, EnabledSyncPaths, _cts.Token);
+                        yield return new WaitUntil(() => applyTask.IsCompleted);
+                        
+                        if (!applyTask.IsFaulted)
+                        {
+                            (_addedFiles, _updatedFiles, _removedFiles) = applyTask.Result;
+                            
+                            // Create empty directories list for incremental sync
+                            _createdDirectories = EnabledSyncPaths.ToDictionary(
+                                sp => sp.Path, 
+                                _ => new List<string>()
+                            );
+                            
+                            useIncrementalSync = true;
+                            
+                            // Save updated sequence
+                            _syncService.SaveSyncState(changes.CurrentSequence);
+                            
+                            // Still need remote mod files for WriteNarcoNetData
+                            Logger.LogDebug("Requesting remote hashes for state persistence...");
+                            Task<Dictionary<string, Dictionary<string, ModFile>>> remoteHashesTask =
+                                _server.GetRemoteHashes(EnabledSyncPaths);
+                            yield return new WaitUntil(() => remoteHashesTask.IsCompleted);
+                            
+                            if (!remoteHashesTask.IsFaulted)
+                            {
+                                _remoteModFiles = remoteHashesTask.Result;
+                            }
+                        }
+                        else
+                        {
+                            Logger.LogWarning($"Failed to apply incremental changes, falling back to full sync: {applyTask.Exception?.Message}");
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogWarning($"Failed to get incremental changes, falling back to full sync: {changesTask.Exception?.Message}");
+                    }
+                }
+                else if (currentSeqTask.Result == syncState.LastSequence)
+                {
+                    Logger.LogInfo("No changes on server since last sync");
+                    _addedFiles = EnabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+                    _updatedFiles = EnabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+                    _removedFiles = EnabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+                    _createdDirectories = EnabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+                    useIncrementalSync = true;
+                    
+                    // Still need remote mod files
+                    Task<Dictionary<string, Dictionary<string, ModFile>>> remoteHashesTask =
+                        _server.GetRemoteHashes(EnabledSyncPaths);
+                    yield return new WaitUntil(() => remoteHashesTask.IsCompleted);
+                    if (!remoteHashesTask.IsFaulted)
+                    {
+                        _remoteModFiles = remoteHashesTask.Result;
+                    }
+                }
+            }
+            else
+            {
+                Logger.LogDebug("No sync state found, will perform full sync");
+            }
+
+            // Fall back to full hash comparison if incremental sync not available/failed
+            if (!useIncrementalSync)
+            {
+                Logger.LogDebug("Performing full sync (requesting remote hashes)...");
+                Task<Dictionary<string, Dictionary<string, ModFile>>> remoteHashesTask =
+                    _server.GetRemoteHashes(EnabledSyncPaths);
+                yield return new WaitUntil(() => remoteHashesTask is { IsCompleted: true });
+                try
+                {
+                    Dictionary<string, Dictionary<string, ModFile>>? remoteHashes = remoteHashesTask.Result;
+                    if (remoteHashes == null)
+                    {
+                        Logger.LogError("Remote hashes task returned null");
+                        yield break;
+                    }
+
+                    _remoteModFiles = remoteHashes;
+                }
+                catch (Exception e)
+                {
+                    Logger.LogError($"Failed to get remote hashes: {e.GetType().Name}: {e.Message}");
+                    Logger.LogError($"Stack trace: {e.StackTrace}");
+                    if (e.InnerException != null)
+                    {
+                        Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                    }
+                    Chainloader.DependencyErrors.Add(
+                        $"Could not load {Info.Metadata.Name} due to error requesting server mod list: {e.Message}"
+                    );
                     yield break;
                 }
 
-                _remoteModFiles = remoteHashes;
-            }
-            catch (Exception e)
-            {
-                Logger.LogError($"Failed to get remote hashes: {e.GetType().Name}: {e.Message}");
-                Logger.LogError($"Stack trace: {e.StackTrace}");
-                if (e.InnerException != null)
+                Logger.LogDebug("Comparing local and remote files...");
+                try
                 {
-                    Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                    AnalyzeModFiles(localModFiles);
                 }
-                Chainloader.DependencyErrors.Add(
-                    $"Could not load {Info.Metadata.Name} due to error requesting server mod list: {e.Message}"
-                );
-                yield break;
+                catch (Exception e)
+                {
+                    Logger.LogError($"Failed to analyze mod files: {e.GetType().Name}: {e.Message}");
+                    Logger.LogError($"Stack trace: {e.StackTrace}");
+                    if (e.InnerException != null)
+                    {
+                        Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                    }
+                    Chainloader.DependencyErrors.Add(
+                        $"Could not load {Info.Metadata.Name} due to error analyzing mod files: {e.Message}"
+                    );
+                    yield break;
+                }
+                
+                // Initialize sync state after successful full sync
+                Task<long> seqTask = _server.GetCurrentSequence();
+                yield return new WaitUntil(() => seqTask.IsCompleted);
+                if (!seqTask.IsFaulted)
+                {
+                    _syncService.SaveSyncState(seqTask.Result);
+                    Logger.LogDebug($"Initialized sync state at sequence {seqTask.Result}");
+                }
             }
 
-            Logger.LogDebug("Comparing local and remote files...");
-            try
+            // Process updates regardless of sync method
+            if (useIncrementalSync && UpdateCount > 0)
             {
-                AnalyzeModFiles(localModFiles);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError($"Failed to analyze mod files: {e.GetType().Name}: {e.Message}");
-                Logger.LogError($"Stack trace: {e.StackTrace}");
-                if (e.InnerException != null)
+                Logger.LogDebug("Processing incremental updates...");
+                if (SilentMode)
                 {
-                    Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                    Task.Run(() => SyncMods(_addedFiles, _updatedFiles, _createdDirectories));
                 }
-                Chainloader.DependencyErrors.Add(
-                    $"Could not load {Info.Metadata.Name} due to error analyzing mod files: {e.Message}"
-                );
+                else
+                {
+                    _uiService.ShowUpdateWindow(
+                        Optional,
+                        Required,
+                        () => Task.Run(() => SyncMods(_addedFiles, _updatedFiles, _createdDirectories)),
+                        Required.Count != 0 && Optional.Count == 0 ? null : SkipUpdatingMods
+                    );
+                }
+            }
+            else if (useIncrementalSync && UpdateCount == 0)
+            {
+                _syncService.WriteNarcoNetData(_remoteModFiles, _removedFiles, EnabledSyncPaths, _configService.DeleteRemovedFiles.Value);
             }
         }
     }

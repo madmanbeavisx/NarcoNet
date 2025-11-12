@@ -18,10 +18,12 @@ public class SyncService
 {
     private readonly SemaphoreSlim _limiter = new(1024, 1024);
     private readonly ILogger<SyncService> _logger;
+    private readonly ChangeLogService _changeLogService;
 
-    public SyncService(ILogger<SyncService> logger)
+    public SyncService(ILogger<SyncService> logger, ChangeLogService changeLogService)
     {
         _logger = logger;
+        _changeLogService = changeLogService;
     }
 
     /// <summary>
@@ -200,5 +202,245 @@ public class SyncService
         }
 
         throw new UnauthorizedAccessException("Path must match one of the configured sync paths");
+    }
+
+    /// <summary>
+    ///     Build a filesystem snapshot from current directory state
+    /// </summary>
+    private async Task<FileSystemSnapshot> BuildSnapshotAsync(
+        List<SyncPath> syncPaths,
+        NarcoNetConfig config,
+        long sequenceNumber,
+        CancellationToken cancellationToken = default)
+    {
+        Dictionary<string, FileMetadata> files = new();
+        string baseDir = Directory.GetCurrentDirectory();
+
+        foreach (SyncPath syncPath in syncPaths)
+        {
+            string fullPath = Path.GetFullPath(syncPath.Path);
+            List<string> fileList = await GetFilesInDirectoryAsync(baseDir, fullPath, config);
+
+            foreach (string file in fileList)
+            {
+                string relativePath = Path.GetRelativePath(baseDir, file);
+                string winPath = PathHelper.ToWindowsPath(relativePath);
+
+                FileInfo fileInfo = new(file);
+                bool isDirectory = fileInfo.Attributes.HasFlag(FileAttributes.Directory) || !File.Exists(file);
+
+                string hash = "";
+                long size = 0;
+                DateTime lastModified = DateTime.MinValue;
+
+                if (!isDirectory && File.Exists(file))
+                {
+                    // Only hash if file is not too large (optimization)
+                    size = fileInfo.Length;
+                    lastModified = fileInfo.LastWriteTimeUtc;
+                }
+
+                files[winPath] = new FileMetadata
+                {
+                    Hash = hash,
+                    Size = size,
+                    LastModified = lastModified,
+                    IsDirectory = isDirectory
+                };
+            }
+        }
+
+        return new FileSystemSnapshot
+        {
+            Files = files,
+            SequenceNumber = sequenceNumber,
+            Timestamp = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    ///     Detect changes between old and new snapshots, generating changelog entries
+    /// </summary>
+    private async Task<List<FileChangeEntry>> DetectChangesAsync(
+        FileSystemSnapshot? oldSnapshot,
+        FileSystemSnapshot newSnapshot,
+        long startSequence,
+        CancellationToken cancellationToken = default)
+    {
+        List<FileChangeEntry> changes = [];
+        long currentSequence = startSequence;
+
+        Dictionary<string, FileMetadata> oldFiles = oldSnapshot?.Files ?? new Dictionary<string, FileMetadata>();
+        Dictionary<string, FileMetadata> newFiles = newSnapshot.Files;
+
+        // Find added and modified files
+        foreach (var (filePath, newMetadata) in newFiles)
+        {
+            if (newMetadata.IsDirectory)
+            {
+                continue; // Skip directories
+            }
+
+            if (!oldFiles.TryGetValue(filePath, out FileMetadata? oldMetadata))
+            {
+                // File was added
+                string hash = await HashSingleFileAsync(filePath, cancellationToken);
+                changes.Add(new FileChangeEntry
+                {
+                    SequenceNumber = ++currentSequence,
+                    Operation = ChangeOperation.Add,
+                    FilePath = filePath,
+                    Hash = hash,
+                    Timestamp = DateTime.UtcNow,
+                    FileSize = newMetadata.Size,
+                    LastModified = newMetadata.LastModified
+                });
+            }
+            else
+            {
+                // Check if file was modified (compare size and timestamp)
+                if (oldMetadata.Size != newMetadata.Size || 
+                    oldMetadata.LastModified != newMetadata.LastModified)
+                {
+                    string hash = await HashSingleFileAsync(filePath, cancellationToken);
+                    
+                    // Only add to changelog if hash actually changed
+                    if (hash != oldMetadata.Hash)
+                    {
+                        changes.Add(new FileChangeEntry
+                        {
+                            SequenceNumber = ++currentSequence,
+                            Operation = ChangeOperation.Modify,
+                            FilePath = filePath,
+                            Hash = hash,
+                            Timestamp = DateTime.UtcNow,
+                            FileSize = newMetadata.Size,
+                            LastModified = newMetadata.LastModified
+                        });
+                    }
+                }
+            }
+        }
+
+        // Find deleted files
+        foreach (var (filePath, oldMetadata) in oldFiles)
+        {
+            if (oldMetadata.IsDirectory)
+            {
+                continue; // Skip directories
+            }
+
+            if (!newFiles.ContainsKey(filePath))
+            {
+                changes.Add(new FileChangeEntry
+                {
+                    SequenceNumber = ++currentSequence,
+                    Operation = ChangeOperation.Delete,
+                    FilePath = filePath,
+                    Hash = "",
+                    Timestamp = DateTime.UtcNow,
+                    FileSize = 0,
+                    LastModified = DateTime.MinValue
+                });
+            }
+        }
+
+        return changes;
+    }
+
+    /// <summary>
+    ///     Hash a single file by its relative path
+    /// </summary>
+    private async Task<string> HashSingleFileAsync(string relativePath, CancellationToken cancellationToken = default)
+    {
+        string baseDir = Directory.GetCurrentDirectory();
+        string fullPath = Path.Combine(baseDir, relativePath);
+
+        if (!File.Exists(fullPath))
+        {
+            return "";
+        }
+
+        await _limiter.WaitAsync(cancellationToken);
+        try
+        {
+            return await FileHasher.HashFileAsync(fullPath, cancellationToken);
+        }
+        finally
+        {
+            _limiter.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Detect and log all file changes since last server run (called on startup)
+    /// </summary>
+    public async Task DetectStartupChangesAsync(
+        List<SyncPath> syncPaths,
+        NarcoNetConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        DateTime startTime = DateTime.UtcNow;
+        _logger.LogInformation("Detecting file changes since last startup...");
+
+        // Load existing changelog and snapshot
+        FileChangeLog changeLog = await _changeLogService.LoadChangeLogAsync(cancellationToken);
+        FileSystemSnapshot? lastSnapshot = await _changeLogService.LoadSnapshotAsync(cancellationToken);
+
+        // Build current snapshot (without hashes initially for speed)
+        FileSystemSnapshot currentSnapshot = await BuildSnapshotAsync(
+            syncPaths, 
+            config, 
+            changeLog.CurrentSequence,
+            cancellationToken);
+
+        // Detect changes between snapshots
+        List<FileChangeEntry> changes = await DetectChangesAsync(
+            lastSnapshot,
+            currentSnapshot,
+            changeLog.CurrentSequence,
+            cancellationToken);
+
+        if (changes.Count > 0)
+        {
+            _logger.LogInformation("Detected {Count} file changes", changes.Count);
+            
+            // Log summary
+            int added = changes.Count(c => c.Operation == ChangeOperation.Add);
+            int modified = changes.Count(c => c.Operation == ChangeOperation.Modify);
+            int deleted = changes.Count(c => c.Operation == ChangeOperation.Delete);
+            _logger.LogInformation("Changes: {Added} added, {Modified} modified, {Deleted} deleted", 
+                added, modified, deleted);
+
+            // Append changes to changelog
+            await _changeLogService.AppendChangesAsync(changes, cancellationToken);
+
+            // Update snapshot with hashes for changed files
+            foreach (var change in changes.Where(c => c.Operation != ChangeOperation.Delete))
+            {
+                if (currentSnapshot.Files.TryGetValue(change.FilePath, out FileMetadata? metadata))
+                {
+                    currentSnapshot.Files[change.FilePath] = metadata with { Hash = change.Hash };
+                }
+            }
+        }
+        else
+        {
+            _logger.LogInformation("No file changes detected");
+        }
+
+        // Save updated snapshot
+        FileSystemSnapshot updatedSnapshot = currentSnapshot with
+        {
+            SequenceNumber = changeLog.CurrentSequence + changes.Count,
+            Timestamp = DateTime.UtcNow
+        };
+        await _changeLogService.SaveSnapshotAsync(updatedSnapshot, cancellationToken);
+
+        // Prune old changelog entries
+        await _changeLogService.PruneOldEntriesAsync(30, cancellationToken);
+
+        double elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
+        _logger.LogInformation("Change detection completed in {Elapsed:F0}ms", elapsed);
     }
 }

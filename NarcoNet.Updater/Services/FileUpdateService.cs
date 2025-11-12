@@ -192,21 +192,32 @@ public class FileUpdateService : IFileUpdateService
     {
         try
         {
-            ValidateFilePath(relativeFilePath);
+            // Normalize path - strip leading ..\ if present since we're already at game root
+            string normalizedPath = relativeFilePath;
+            if (normalizedPath.StartsWith("..\\", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedPath = normalizedPath.Substring(3);
+            }
+            else if (normalizedPath.StartsWith("../", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedPath = normalizedPath.Substring(3);
+            }
 
-            string targetFilePath = Path.Combine(_targetDirectory, relativeFilePath);
+            ValidateFilePath(normalizedPath);
+
+            string targetFilePath = Path.Combine(_targetDirectory, normalizedPath);
 
             if (!File.Exists(targetFilePath))
             {
-                _logger.LogWarning($"File already removed: {relativeFilePath}");
+                _logger.LogWarning($"File already removed: {normalizedPath}");
                 return;
             }
 
-            _logger.LogDebug($"Deleting file: {relativeFilePath}");
+            _logger.LogDebug($"Deleting file: {normalizedPath}");
 
             await Task.Run(() => File.Delete(targetFilePath), cancellationToken);
 
-            _logger.LogDebug($"File deleted: {relativeFilePath}");
+            _logger.LogDebug($"File deleted: {normalizedPath}");
 
             // Clean up empty safe houses
             await CleanupEmptyParentDirectoriesAsync(targetFilePath, cancellationToken);

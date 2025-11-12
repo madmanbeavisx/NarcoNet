@@ -1,5 +1,6 @@
 using System.Net.Http;
 
+using NarcoNet.Models;
 using NarcoNet.Utilities;
 
 using SPT.Common.Http;
@@ -134,6 +135,42 @@ public class ServerModule(Version pluginVersion)
         catch (Exception e)
         {
             NarcoPlugin.Logger.LogError($"Failed to get remote hashes: {e.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Get the current sequence number from the server
+    /// </summary>
+    internal async Task<long> GetCurrentSequence()
+    {
+        try
+        {
+            string json = await GetJsonTask("/narconet/sequence");
+            var response = Json.Deserialize<SequenceResponse>(json);
+            return response.CurrentSequence;
+        }
+        catch (Exception e)
+        {
+            NarcoPlugin.Logger.LogError($"Failed to get current sequence: {e.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Get incremental file changes since a specific sequence number
+    /// </summary>
+    internal async Task<ChangesResponse> GetChangesSince(long sinceSequence)
+    {
+        try
+        {
+            string json = await GetJsonTask($"/narconet/changes?since={sinceSequence}");
+            var response = Json.Deserialize<ChangesResponse>(json);
+            return response;
+        }
+        catch (Exception e)
+        {
+            NarcoPlugin.Logger.LogError($"Failed to get changes since {sinceSequence}: {e.Message}");
             throw;
         }
     }

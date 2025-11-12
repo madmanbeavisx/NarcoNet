@@ -1,3 +1,4 @@
+using NarcoNet.Models;
 using NarcoNet.Utilities;
 
 namespace NarcoNet.Services;
@@ -30,6 +31,7 @@ public interface IClientSyncService
         SyncPathFileList filesToAdd,
         SyncPathFileList filesToUpdate,
         SyncPathFileList directoriesToCreate,
+        SyncPathFileList filesToRemove,
         List<SyncPath> enabledSyncPaths,
         bool deleteRemovedFiles,
         string pendingUpdatesDir,
@@ -91,4 +93,23 @@ public interface IClientSyncService
         bool deleteRemovedFiles,
         string pendingUpdatesDir,
         SyncPathModFiles remoteModFiles);
+
+    /// <summary>
+    ///     Load the client's last known sync state
+    /// </summary>
+    ClientSyncState? LoadSyncState();
+
+    /// <summary>
+    ///     Save the client's current sync state
+    /// </summary>
+    void SaveSyncState(long sequence);
+
+    /// <summary>
+    ///     Apply incremental changes from the server changelog
+    /// </summary>
+    Task<(SyncPathFileList added, SyncPathFileList updated, SyncPathFileList removed)> 
+        ApplyIncrementalChangesAsync(
+            ChangesResponse changesResponse,
+            List<SyncPath> enabledSyncPaths,
+            CancellationToken cancellationToken = default);
 }

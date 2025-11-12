@@ -1,4 +1,5 @@
 using BepInEx.Logging;
+using NarcoNet.Models;
 using NarcoNet.Updater.Models;
 using NarcoNet.Utilities;
 using SPT.Common.Utils;
@@ -16,6 +17,7 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
     private static readonly string NarcoNetDir = Path.Combine(Directory.GetCurrentDirectory(), "NarcoNet_Data");
     private static readonly string PreviousSyncPath = Path.Combine(NarcoNetDir, "PreviousSync.json");
     private static readonly string RemovedFilesPath = Path.Combine(NarcoNetDir, "RemovedFiles.json");
+    private static readonly string SyncStatePath = Path.Combine(NarcoNetDir, "SyncState.json");
 
     /// <inheritdoc/>
     public void AnalyzeModFiles(
@@ -56,6 +58,7 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         SyncPathFileList filesToAdd,
         SyncPathFileList filesToUpdate,
         SyncPathFileList directoriesToCreate,
+        SyncPathFileList filesToRemove,
         List<SyncPath> enabledSyncPaths,
         bool deleteRemovedFiles,
         string pendingUpdatesDir,
@@ -67,7 +70,61 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
             Directory.CreateDirectory(pendingUpdatesDir);
         }
 
-        // Create directories first (only for non-restart-required paths)
+        // Delete removed files first (only for non-restart-required paths)
+        if (deleteRemovedFiles)
+        {
+            foreach (SyncPath syncPath in enabledSyncPaths.Where(sp => !sp.RestartRequired))
+            {
+                if (!filesToRemove.TryGetValue(syncPath.Path, out var removeFiles))
+                {
+                    continue;
+                }
+
+                foreach (string file in removeFiles)
+                {
+                    try
+                    {
+                        string fullPath = Path.Combine(Directory.GetCurrentDirectory(), file);
+                        if (File.Exists(fullPath))
+                        {
+                            File.Delete(fullPath);
+                            logger.LogDebug($"Deleted file: {file}");
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError($"Failed to delete file '{file}': {e.Message}");
+                    }
+                }
+            }
+        }
+        // Also delete files for enforced paths regardless of deleteRemovedFiles setting
+        foreach (SyncPath syncPath in enabledSyncPaths.Where(sp => sp.Enforced && !sp.RestartRequired))
+        {
+            if (!filesToRemove.TryGetValue(syncPath.Path, out var removeFiles))
+            {
+                continue;
+            }
+
+            foreach (string file in removeFiles)
+            {
+                try
+                {
+                    string fullPath = Path.Combine(Directory.GetCurrentDirectory(), file);
+                    if (File.Exists(fullPath))
+                    {
+                        File.Delete(fullPath);
+                        logger.LogDebug($"Deleted enforced file: {file}");
+                    }
+                }
+                catch (Exception e)
+                {
+                    logger.LogError($"Failed to delete enforced file '{file}': {e.Message}");
+                }
+            }
+        }
+
+        // Create directories (only for non-restart-required paths)
         foreach (SyncPath syncPath in enabledSyncPaths.Where(sp => !sp.RestartRequired))
         {
             foreach (string dir in directoriesToCreate[syncPath.Path])
@@ -316,6 +373,128 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         VFS.WriteTextFile(manifestPath, Json.Serialize(manifest));
 
         logger.LogDebug($"Wrote update manifest with {manifest.Operations.Count} operations");
+    }
+
+    /// <summary>
+    ///     Load the client's last known sync state
+    /// </summary>
+    public ClientSyncState? LoadSyncState()
+    {
+        if (!File.Exists(SyncStatePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            string json = VFS.ReadTextFile(SyncStatePath);
+            return Json.Deserialize<ClientSyncState>(json);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning($"Failed to load sync state: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Save the client's current sync state
+    /// </summary>
+    public void SaveSyncState(long sequence)
+    {
+        var state = new ClientSyncState
+        {
+            LastSequence = sequence,
+            LastSyncTime = DateTime.UtcNow
+        };
+
+        try
+        {
+            VFS.WriteTextFile(SyncStatePath, Json.Serialize(state));
+            logger.LogDebug($"Saved sync state at sequence {sequence}");
+        }
+        catch (Exception e)
+        {
+            logger.LogError($"Failed to save sync state: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    ///     Apply incremental changes from the server changelog
+    /// </summary>
+    public async Task<(SyncPathFileList added, SyncPathFileList updated, SyncPathFileList removed)> 
+        ApplyIncrementalChangesAsync(
+            ChangesResponse changesResponse,
+            List<SyncPath> enabledSyncPaths,
+            CancellationToken cancellationToken = default)
+    {
+        logger.LogInfo($"Applying {changesResponse.Changes.Count} incremental changes from server");
+
+        // Group changes by operation type
+        SyncPathFileList addedFiles = enabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+        SyncPathFileList updatedFiles = enabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+        SyncPathFileList removedFiles = enabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
+
+        foreach (var change in changesResponse.Changes.OrderBy(c => c.SequenceNumber))
+        {
+            // Find which sync path this file belongs to
+            // The file path from server includes the full path, need to match against sync path
+            SyncPath? matchingSyncPath = null;
+            
+            foreach (var sp in enabledSyncPaths)
+            {
+                // Normalize paths for comparison
+                string normalizedSyncPath = sp.Path.Replace("/", "\\").TrimEnd('\\');
+                string normalizedFilePath = change.FilePath.Replace("/", "\\");
+                
+                // Check if file path starts with sync path (case insensitive)
+                if (normalizedFilePath.StartsWith(normalizedSyncPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchingSyncPath = sp;
+                    break;
+                }
+            }
+
+            if (matchingSyncPath == null)
+            {
+                // If no direct match, just add to the first enabled sync path
+                // This handles cases where the file path doesn't exactly match the sync path prefix
+                logger.LogDebug($"No exact sync path match for '{change.FilePath}', adding to first enabled path");
+                matchingSyncPath = enabledSyncPaths.FirstOrDefault();
+                
+                if (matchingSyncPath == null)
+                {
+                    logger.LogWarning($"No enabled sync paths available for file '{change.FilePath}'");
+                    continue;
+                }
+            }
+
+            switch (change.Operation)
+            {
+                case "Add":
+                    addedFiles[matchingSyncPath.Path].Add(change.FilePath);
+                    logger.LogDebug($"  + {change.FilePath}");
+                    break;
+
+                case "Modify":
+                    updatedFiles[matchingSyncPath.Path].Add(change.FilePath);
+                    logger.LogDebug($"  * {change.FilePath}");
+                    break;
+
+                case "Delete":
+                    removedFiles[matchingSyncPath.Path].Add(change.FilePath);
+                    logger.LogDebug($"  - {change.FilePath}");
+                    break;
+            }
+        }
+
+        int totalAdded = addedFiles.Sum(kvp => kvp.Value.Count);
+        int totalUpdated = updatedFiles.Sum(kvp => kvp.Value.Count);
+        int totalRemoved = removedFiles.Sum(kvp => kvp.Value.Count);
+
+        logger.LogInfo($"Changes: {totalAdded} added, {totalUpdated} updated, {totalRemoved} removed");
+
+        return (addedFiles, updatedFiles, removedFiles);
     }
 
     private void LogFileChanges(string changeType, SyncPathFileList changes)
