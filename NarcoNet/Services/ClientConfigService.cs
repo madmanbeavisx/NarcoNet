@@ -72,10 +72,10 @@ public class ClientConfigService : IClientConfigService
                 syncPath.Path,
                 config.Bind(
                     "Synced Paths",
-                    syncPath.Name.Replace("\\", "/"),
+                    syncPath.Name.Replace('\\', '/').Replace(Path.DirectorySeparatorChar, '/'),
                     syncPath.Enabled,
                     new ConfigDescription(
-                        $"Should the mod attempt to sync files from {syncPath.Path.Replace("\\", "/")}",
+                        $"Should the mod attempt to sync files from {syncPath.Path.Replace('\\', '/').Replace(Path.DirectorySeparatorChar, '/')}",
                         null,
                         new ConfigurationManagerAttributes { ReadOnly = syncPath.Enforced }
                     )

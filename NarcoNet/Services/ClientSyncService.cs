@@ -161,7 +161,7 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
                         if (syncPath.RestartRequired)
                         {
                             // Strip ..\ prefix for local storage in PendingUpdates
-                            string localPath = file.StartsWith("..\\", StringComparison.OrdinalIgnoreCase)
+                            string localPath = file.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
                                 ? file.Substring(3)
                                 : file;
 
@@ -340,7 +340,7 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
                 // File paths contain ..\ because they're relative to NarcoNet_Data
                 // Source is relative to PendingUpdates, Destination is relative to game root
                 // Both need the ..\ stripped since updater works from game root
-                string normalizedPath = file.StartsWith("..\\", StringComparison.OrdinalIgnoreCase)
+                string normalizedPath = file.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
                     ? file.Substring(3)
                     : file;
 
@@ -444,8 +444,8 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
             foreach (var sp in enabledSyncPaths)
             {
                 // Normalize paths for comparison
-                string normalizedSyncPath = sp.Path.Replace("/", "\\").TrimEnd('\\');
-                string normalizedFilePath = change.FilePath.Replace("/", "\\");
+                string normalizedSyncPath = sp.NormalizedPath.TrimEnd(Path.DirectorySeparatorChar);
+                string normalizedFilePath = change.FilePath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 
                 // Check if file path starts with sync path (case insensitive)
                 if (normalizedFilePath.StartsWith(normalizedSyncPath, StringComparison.OrdinalIgnoreCase))

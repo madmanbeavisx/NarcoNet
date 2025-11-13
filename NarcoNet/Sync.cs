@@ -143,11 +143,11 @@ public static class Sync
 
         return Directory
             .GetFiles(directory, "*", SearchOption.TopDirectoryOnly)
-            .Where(file => !IsExcluded(exclusions, file.Replace($"{basePath}\\", "")))
+            .Where(file => !IsExcluded(exclusions, file.Replace($"{basePath}{Path.DirectorySeparatorChar}", "")))
             .Concat(
                 Directory
                     .GetDirectories(directory, "*", SearchOption.TopDirectoryOnly)
-                    .Where(subDir => !IsExcluded(exclusions, subDir.Replace($"{basePath}\\", "")))
+                    .Where(subDir => !IsExcluded(exclusions, subDir.Replace($"{basePath}{Path.DirectorySeparatorChar}", "")))
                     .SelectMany(subDir => Directory.GetFileSystemEntries(subDir).Length == 0
                         ? [subDir]
                         : GetFilesInDirectory(basePath, subDir, exclusions))
@@ -173,7 +173,7 @@ public static class Sync
         foreach (SyncPath syncPath in syncPaths)
         {
             string narcoNetDataPath = Path.Combine(basePath, "NarcoNet_Data");
-            string path = Path.GetFullPath(Path.Combine(narcoNetDataPath, syncPath.Path));
+            string path = Path.GetFullPath(Path.Combine(narcoNetDataPath, syncPath.NormalizedPath));
 
             List<Regex> exclusionsToUse = [.. remoteExclusions, .. (syncPath.Enforced ? [] : localExclusions)];
             results[syncPath.Path] = (
@@ -190,9 +190,9 @@ public static class Sync
                                 processedFiles.Add(file);
                                 // Convert absolute path back to relative path matching syncPath.Path format
                                 // Replace the game root path with empty string, then prepend ".."
-                                // e.g., C:\SPT\BepInEx\plugins\file.dll -> ..\\BepInEx\\plugins\\file.dll
-                                string pathFromGameRoot = file.Replace($"{basePath}\\", "");
-                                string relativePath = "..\\" + pathFromGameRoot;
+                                // e.g., C:\SPT\BepInEx\plugins\file.dll -> ../BepInEx/plugins/file.dll (or ..\ on Windows)
+                                string pathFromGameRoot = file.Replace($"{basePath}{Path.DirectorySeparatorChar}", "");
+                                string relativePath = $"..{Path.DirectorySeparatorChar}" + pathFromGameRoot;
                                 return new KeyValuePair<string, ModFile>(relativePath, modFile);
                             }
                         )

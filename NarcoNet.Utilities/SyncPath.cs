@@ -9,4 +9,12 @@ public record SyncPath(
     bool RestartRequired = true)
 {
     public string Name { get; init; } = string.IsNullOrEmpty(Name) ? Path : Name;
+    
+    /// <summary>
+    /// Gets the path with platform-appropriate directory separators.
+    /// Converts both forward slashes and backslashes to the current platform's separator.
+    /// </summary>
+    public string NormalizedPath => Path
+        .Replace('\\', System.IO.Path.DirectorySeparatorChar)
+        .Replace('/', System.IO.Path.DirectorySeparatorChar);
 }
