@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
@@ -163,9 +164,7 @@ public static class Sync
     )
     {
         Stopwatch watch = Stopwatch.StartNew();
-        HashSet<string> processedFiles =
-        [
-        ];
+        ConcurrentBag<string> processedFiles = new();
         SemaphoreSlim limitOpenFiles = new(1024);
 
         SyncPathModFiles results = new();

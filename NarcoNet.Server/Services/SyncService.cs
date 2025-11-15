@@ -150,11 +150,17 @@ public class SyncService
         DateTime startTime = DateTime.UtcNow;
 
         string baseDir = Directory.GetCurrentDirectory();
+#if NARCONET_DEBUG_LOGGING
+        _logger.LogDebug($"HashModFilesAsync: Starting to hash files in {syncPaths.Count} sync paths");
+#endif
 
         foreach (SyncPath syncPath in syncPaths)
         {
             string fullPath = Path.GetFullPath(syncPath.Path);
             List<string> files = await GetFilesInDirectoryAsync(baseDir, fullPath, config);
+#if NARCONET_DEBUG_LOGGING
+            _logger.LogDebug($"  {syncPath.Path}: Found {files.Count} files");
+#endif
             ConcurrentDictionary<string, ModFile> filesResult = new();
 
             // Process files in parallel

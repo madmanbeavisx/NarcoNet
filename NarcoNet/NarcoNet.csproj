@@ -9,6 +9,11 @@
         <DeployAfterBuild>true</DeployAfterBuild>
     </PropertyGroup>
 
+    <!-- Debug configuration: Enable detailed logging -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DefineConstants>$(DefineConstants);DEBUG;TRACE;NARCONET_DEBUG_LOGGING</DefineConstants>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
     </ItemGroup>

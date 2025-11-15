@@ -109,6 +109,9 @@ public class NarcoNetHttpListener(
         try
         {
             string path = context.Request.Path.Value ?? "";
+#if NARCONET_DEBUG_LOGGING
+            logger.LogDebug($"NarcoNet request received: {context.Request.Method} {path}");
+#endif
 
             if (path == "/narconet/version")
             {
@@ -219,11 +222,17 @@ public class NarcoNetHttpListener(
     private async Task HandleGetHashes(HttpContext context)
     {
         string? version = context.Request.Headers["narconet-version"].FirstOrDefault();
+#if NARCONET_DEBUG_LOGGING
+        logger.LogDebug($"HandleGetHashes: Client version: {version ?? "unknown"}");
+#endif
 
         string json;
         if (!string.IsNullOrEmpty(version) && FallbackHashes.ContainsKey(version))
         {
             json = JsonSerializer.Serialize(FallbackHashes[version]);
+#if NARCONET_DEBUG_LOGGING
+            logger.LogDebug($"Using fallback hashes for version {version}");
+#endif
         }
         else
         {
@@ -236,6 +245,12 @@ public class NarcoNetHttpListener(
                 // Client requested specific paths - only hash those (if enabled or enforced)
                 List<string?> requestedPaths = pathsParam.ToList();
                 logger.LogDebug("Client requested {Count} specific paths", requestedPaths.Count);
+#if NARCONET_DEBUG_LOGGING
+                foreach (var reqPath in requestedPaths)
+                {
+                    logger.LogDebug($"  - {reqPath}");
+                }
+#endif
                 pathsToHash = _config!.SyncPaths
                     .Where(sp => (sp.Enabled || sp.Enforced) && requestedPaths.Contains(sp.Path))
                     .ToList();

@@ -21,6 +21,11 @@
         <DeployAfterBuild>true</DeployAfterBuild>
     </PropertyGroup>
 
+    <!-- Debug configuration: Enable detailed logging -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DefineConstants>$(DefineConstants);DEBUG;TRACE;NARCONET_DEBUG_LOGGING</DefineConstants>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="SPTarkov.Common" Version="4.0.3">
             <PrivateAssets>all</PrivateAssets>

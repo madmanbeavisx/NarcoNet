@@ -55,6 +55,9 @@ public class NarcoNetServer(
     {
         try
         {
+#if NARCONET_DEBUG_LOGGING
+            logger.LogDebug("PreSptLoadAsync starting...");
+#endif
             // Get mod path
             string? modPath = GetModPath();
             if (string.IsNullOrEmpty(modPath))
@@ -64,8 +67,20 @@ public class NarcoNetServer(
                 return;
             }
 
+#if NARCONET_DEBUG_LOGGING
+            logger.LogDebug($"Mod path found: {modPath}");
+#endif
+
             // Load configuration
             NarcoNetConfig config = await configService.LoadConfigAsync(modPath);
+#if NARCONET_DEBUG_LOGGING
+            logger.LogDebug($"Configuration loaded successfully");
+            logger.LogDebug($"Sync paths configured: {config.SyncPaths.Count}");
+            foreach (var syncPath in config.SyncPaths)
+            {
+                logger.LogDebug($"  - {syncPath.Path} (Enabled: {syncPath.Enabled}, RestartRequired: {syncPath.RestartRequired}, Enforced: {syncPath.Enforced})");
+            }
+#endif
 
             // Detect file changes since last startup
             await syncService.DetectStartupChangesAsync(config.SyncPaths, config);
@@ -87,6 +102,9 @@ public class NarcoNetServer(
             {
                 httpListener.Initialize(config, NarcoNetVersion.Version);
                 logger.LogInformation("NarcoNet server mod loaded successfully");
+#if NARCONET_DEBUG_LOGGING
+                logger.LogDebug("HTTP listener initialized successfully");
+#endif
             }
         }
         catch (Exception ex)
@@ -108,7 +126,10 @@ public class NarcoNetServer(
                 return null;
             }
 
-            string[] modDirectories = Directory.GetDirectories(modsPath, "*narconet*", SearchOption.TopDirectoryOnly);
+            // Case-insensitive search for cross-platform compatibility
+            string[] modDirectories = Directory.GetDirectories(modsPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(dir => Path.GetFileName(dir).Contains("narconet", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
             return modDirectories.Length > 0 ? modDirectories[0] : null;
         }
         catch

@@ -20,12 +20,33 @@ public class ServerModule(Version pluginVersion)
             using HttpClient client = new();
             client.DefaultRequestHeaders.Add("narconet-version", pluginVersion.ToString());
             client.Timeout = TimeSpan.FromMinutes(3);
+#if NARCONET_DEBUG_LOGGING
+            NarcoPlugin.Logger.LogDebug($"GetJsonTask: Requesting {RequestHandler.Host}{jsonPath}");
+#endif
             string jsonResponse = await client.GetStringAsync($"{RequestHandler.Host}{jsonPath}");
             return jsonResponse;
         }
         catch (Exception e)
         {
-            NarcoPlugin.Logger.LogError($"Request failed for {jsonPath}: {e.Message}");
+            NarcoPlugin.Logger.LogError($"Request failed for {jsonPath}");
+            NarcoPlugin.Logger.LogError($"  Exception Type: {e.GetType().FullName}");
+            NarcoPlugin.Logger.LogError($"  Message: {(string.IsNullOrEmpty(e.Message) ? "<empty>" : e.Message)}");
+            NarcoPlugin.Logger.LogError($"  URL: {RequestHandler.Host}{jsonPath}");
+
+            if (e is HttpRequestException)
+            {
+#if NARCONET_DEBUG_LOGGING
+                NarcoPlugin.Logger.LogDebug($"  HTTP Request Exception Details: {e}");
+#endif
+            }
+
+            if (e.InnerException != null)
+            {
+                NarcoPlugin.Logger.LogError($"  Inner Exception: {e.InnerException.GetType().FullName}");
+                NarcoPlugin.Logger.LogError($"  Inner Message: {(string.IsNullOrEmpty(e.InnerException.Message) ? "<empty>" : e.InnerException.Message)}");
+            }
+
+            NarcoPlugin.Logger.LogError($"  Stack Trace: {e.StackTrace}");
             throw;
         }
     }
@@ -85,11 +106,22 @@ public class ServerModule(Version pluginVersion)
                         int retryTime = 2 * retryCount;
                         NarcoPlugin.Logger.LogDebug(
                             $"Download failed for '{file}', retrying in {retryTime} seconds (Attempt {retryCount}/5)");
+#if NARCONET_DEBUG_LOGGING
+                        NarcoPlugin.Logger.LogDebug($"  Exception: {e.GetType().FullName}: {(string.IsNullOrEmpty(e.Message) ? "<empty>" : e.Message)}");
+#endif
                         break;
                     case > 5:
-                        NarcoPlugin.Logger.LogError(
-                            $"Download failed for '{file}' after {retryCount} attempts: {e}"
-                        );
+                        NarcoPlugin.Logger.LogError($"Download failed for '{file}' after {retryCount} attempts");
+                        NarcoPlugin.Logger.LogError($"  Exception Type: {e.GetType().FullName}");
+                        NarcoPlugin.Logger.LogError($"  Message: {(string.IsNullOrEmpty(e.Message) ? "<empty>" : e.Message)}");
+
+                        if (e.InnerException != null)
+                        {
+                            NarcoPlugin.Logger.LogError($"  Inner Exception: {e.InnerException.GetType().FullName}");
+                            NarcoPlugin.Logger.LogError($"  Inner Message: {(string.IsNullOrEmpty(e.InnerException.Message) ? "<empty>" : e.InnerException.Message)}");
+                        }
+
+                        NarcoPlugin.Logger.LogError($"  Stack Trace: {e.StackTrace}");
                         throw;
                 }
             }
@@ -121,8 +153,16 @@ public class ServerModule(Version pluginVersion)
 
         try
         {
-            string json = await GetJsonTask($"/narconet/hashes?path={string.Join("&path=",
-                paths.Select(path => Uri.EscapeDataString(path.Path.Replace(@"\", "/"))))}");
+            string queryString = string.Join("&path=", paths.Select(path => Uri.EscapeDataString(path.Path.Replace(@"\", "/"))));
+#if NARCONET_DEBUG_LOGGING
+            NarcoPlugin.Logger.LogDebug($"GetRemoteHashes: Requesting hashes for {paths.Count} paths");
+            NarcoPlugin.Logger.LogDebug($"  Query: /narconet/hashes?path={queryString}");
+#endif
+            string json = await GetJsonTask($"/narconet/hashes?path={queryString}");
+
+#if NARCONET_DEBUG_LOGGING
+            NarcoPlugin.Logger.LogDebug($"GetRemoteHashes: Received JSON response ({json.Length} bytes)");
+#endif
 
             var rawData =
                 Json.Deserialize<Dictionary<string, Dictionary<string, ModFile>>>(json);
@@ -134,7 +174,17 @@ public class ServerModule(Version pluginVersion)
         }
         catch (Exception e)
         {
-            NarcoPlugin.Logger.LogError($"Failed to get remote hashes: {e.Message}");
+            NarcoPlugin.Logger.LogError($"Failed to get remote hashes");
+            NarcoPlugin.Logger.LogError($"  Exception Type: {e.GetType().FullName}");
+            NarcoPlugin.Logger.LogError($"  Message: {(string.IsNullOrEmpty(e.Message) ? "<empty>" : e.Message)}");
+
+            if (e.InnerException != null)
+            {
+                NarcoPlugin.Logger.LogError($"  Inner Exception: {e.InnerException.GetType().FullName}");
+                NarcoPlugin.Logger.LogError($"  Inner Message: {(string.IsNullOrEmpty(e.InnerException.Message) ? "<empty>" : e.InnerException.Message)}");
+            }
+
+            NarcoPlugin.Logger.LogError($"  Stack Trace: {e.StackTrace}");
             throw;
         }
     }

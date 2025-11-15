@@ -669,14 +669,28 @@ public class NarcoPlugin : BaseUnityPlugin, IDisposable
                 }
                 catch (Exception e)
                 {
-                    Logger.LogError($"Failed to get remote hashes: {e.GetType().Name}: {e.Message}");
-                    Logger.LogError($"Stack trace: {e.StackTrace}");
+                    Logger.LogError("Failed to get remote hashes");
+                    Logger.LogError($"  Exception Type: {e.GetType().FullName}");
+                    Logger.LogError($"  Message: {(string.IsNullOrEmpty(e.Message) ? "<empty>" : e.Message)}");
+
                     if (e.InnerException != null)
                     {
-                        Logger.LogError($"Inner exception: {e.InnerException.GetType().Name}: {e.InnerException.Message}");
+                        Logger.LogError($"  Inner Exception: {e.InnerException.GetType().FullName}");
+                        Logger.LogError($"  Inner Message: {(string.IsNullOrEmpty(e.InnerException.Message) ? "<empty>" : e.InnerException.Message)}");
+
+                        // Check for deeper nested exceptions
+                        if (e.InnerException.InnerException != null)
+                        {
+                            Logger.LogError($"  Nested Exception: {e.InnerException.InnerException.GetType().FullName}");
+                            Logger.LogError($"  Nested Message: {(string.IsNullOrEmpty(e.InnerException.InnerException.Message) ? "<empty>" : e.InnerException.InnerException.Message)}");
+                        }
                     }
+
+                    Logger.LogError($"  Stack Trace: {e.StackTrace}");
+
+                    string errorMsg = string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message;
                     Chainloader.DependencyErrors.Add(
-                        $"Could not load {Info.Metadata.Name} due to error requesting server mod list: {e.Message}"
+                        $"Could not load {Info.Metadata.Name} due to error requesting server mod list: {errorMsg}"
                     );
                     yield break;
                 }

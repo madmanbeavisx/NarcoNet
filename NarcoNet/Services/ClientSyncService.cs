@@ -30,6 +30,9 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         out SyncPathFileList removedFiles,
         out SyncPathFileList createdDirectories)
     {
+#if NARCONET_DEBUG_LOGGING
+        logger.LogDebug($"AnalyzeModFiles: Comparing {localModFiles.Count} local sync paths with {remoteModFiles.Count} remote sync paths");
+#endif
         Sync.CompareModFiles(
             Directory.GetCurrentDirectory(),
             enabledSyncPaths,
@@ -68,7 +71,14 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
         if (!Directory.Exists(pendingUpdatesDir))
         {
             Directory.CreateDirectory(pendingUpdatesDir);
+#if NARCONET_DEBUG_LOGGING
+            logger.LogDebug($"Created pending updates directory: {pendingUpdatesDir}");
+#endif
         }
+
+#if NARCONET_DEBUG_LOGGING
+        logger.LogDebug($"SyncModsAsync: Processing {filesToAdd.Sum(x => x.Value.Count)} additions, {filesToUpdate.Sum(x => x.Value.Count)} updates, {filesToRemove.Sum(x => x.Value.Count)} removals");
+#endif
 
         // Delete removed files first (only for non-restart-required paths)
         if (deleteRemovedFiles)
@@ -151,6 +161,15 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
         logger.LogDebug($"Downloading files...");
+#if NARCONET_DEBUG_LOGGING
+        foreach (var kvp in filesToDownload)
+        {
+            if (kvp.Value.Count > 0)
+            {
+                logger.LogDebug($"  {kvp.Key}: {kvp.Value.Count} files to download");
+            }
+        }
+#endif
 
         List<Task> downloadTasks = enabledSyncPaths
             .SelectMany(syncPath =>
@@ -422,13 +441,16 @@ public class ClientSyncService(ManualLogSource logger, ServerModule serverModule
     /// <summary>
     ///     Apply incremental changes from the server changelog
     /// </summary>
-    public async Task<(SyncPathFileList added, SyncPathFileList updated, SyncPathFileList removed)> 
+    public async Task<(SyncPathFileList added, SyncPathFileList updated, SyncPathFileList removed)>
         ApplyIncrementalChangesAsync(
             ChangesResponse changesResponse,
             List<SyncPath> enabledSyncPaths,
             CancellationToken cancellationToken = default)
     {
         logger.LogInfo($"Applying {changesResponse.Changes.Count} incremental changes from server");
+#if NARCONET_DEBUG_LOGGING
+        logger.LogDebug($"Server current sequence: {changesResponse.CurrentSequence}");
+#endif
 
         // Group changes by operation type
         SyncPathFileList addedFiles = enabledSyncPaths.ToDictionary(sp => sp.Path, _ => new List<string>());
