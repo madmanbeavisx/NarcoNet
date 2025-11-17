@@ -137,6 +137,10 @@ public class NarcoNetHttpListener(
             {
                 await HandleGetCurrentSequence(context);
             }
+            else if (path == "/narconet/recheck")
+            {
+                await HandleRecheck(context);
+            }
             else if (path.StartsWith("/narconet/fetch/"))
             {
                 await HandleFetchModFile(context);
@@ -392,6 +396,56 @@ public class NarcoNetHttpListener(
             logger.LogError(ex, "Error reading file '{FilePath}'", filePath);
             context.Response.StatusCode = 500;
             await context.Response.WriteAsync($"NarcoNet: Error reading '{filePath}'\n{ex}");
+        }
+    }
+
+    private async Task HandleRecheck(HttpContext context)
+    {
+        try
+        {
+            // Get sequence before recheck
+            long beforeSequence = await changeLogService.GetCurrentSequenceAsync(context.RequestAborted);
+
+            // Perform an on-demand recheck (does not use the startup-specific method)
+            List<FileChangeEntry> changes = await syncService.RecheckAsync(_config!.SyncPaths, _config, context.RequestAborted);
+
+            // Get sequence after recheck
+            long afterSequence = await changeLogService.GetCurrentSequenceAsync(context.RequestAborted);
+
+            var response = new
+            {
+                BeforeSequence = beforeSequence,
+                AfterSequence = afterSequence,
+                Changes = changes.Select(c => new
+                {
+                    c.SequenceNumber,
+                    Operation = c.Operation.ToString(),
+                    c.FilePath,
+                    c.Hash,
+                    c.Timestamp,
+                    c.FileSize,
+                    c.LastModified
+                }).ToList()
+            };
+
+            string json = JsonSerializer.Serialize(response);
+            byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
+
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = 200;
+            await context.Response.Body.WriteAsync(jsonBytes);
+            await context.Response.StartAsync();
+            await context.Response.CompleteAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            context.Response.StatusCode = 499; // Client Closed Request (non-standard)
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error handling recheck request");
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsync($"NarcoNet: Error handling recheck: {ex}");
         }
     }
 }
