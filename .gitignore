@@ -367,6 +367,3 @@ MigrationBackup/
 FodyWeavers.xsd
 
 **/[Bb]uild/
-
-# Ignore project files locally — tracked files will remain in the repo but local edits can be marked assume-unchanged
-*.csproj
