@@ -47,6 +47,12 @@
               IgnoreExitCode="true"
               Condition="Exists('$(MSBuildThisFileDirectory)Build\SPT\user')" />
 
+        <!-- Copy run-recheck.bat into repo Build folder if it exists (keep with other deploy steps) -->
+        <Exec Command="xcopy &quot;$(MSBuildThisFileDirectory)run-recheck.ps1&quot; &quot;$(MSBuildThisFileDirectory)Build\&quot; /Y /Q"
+              ContinueOnError="true"
+              IgnoreExitCode="true"
+              Condition="Exists('$(MSBuildThisFileDirectory)run-recheck.ps1')" />
+
         <Message Importance="high" Text="Deployment to test locations complete!" />
     </Target>
 </Project>

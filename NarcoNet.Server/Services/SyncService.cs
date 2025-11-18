@@ -449,4 +449,67 @@ public class SyncService
         double elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
         _logger.LogInformation("Change detection completed in {Elapsed:F0}ms", elapsed);
     }
+
+    /// <summary>
+    ///     Perform an on-demand recheck of the configured sync paths, comparing
+    ///     current filesystem state to the last saved snapshot. This is similar
+    ///     to the startup detection logic but intended to be called at runtime
+    ///     (e.g. from an HTTPS endpoint) and returns the detected changes.
+    /// </summary>
+    public async Task<List<FileChangeEntry>> RecheckAsync(
+        List<SyncPath> syncPaths,
+        NarcoNetConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        DateTime startTime = DateTime.UtcNow;
+
+        // Load existing changelog and snapshot
+        FileChangeLog changeLog = await _changeLogService.LoadChangeLogAsync(cancellationToken);
+        FileSystemSnapshot? lastSnapshot = await _changeLogService.LoadSnapshotAsync(cancellationToken);
+
+        // Build current snapshot (without hashes initially for speed)
+        FileSystemSnapshot currentSnapshot = await BuildSnapshotAsync(
+            syncPaths,
+            config,
+            changeLog.CurrentSequence,
+            cancellationToken);
+
+        // Detect changes between snapshots
+        List<FileChangeEntry> changes = await DetectChangesAsync(
+            lastSnapshot,
+            currentSnapshot,
+            changeLog.CurrentSequence,
+            cancellationToken);
+
+        if (changes.Count > 0)
+        {
+            // Append changes to changelog
+            await _changeLogService.AppendChangesAsync(changes, cancellationToken);
+
+            // Update snapshot with hashes for changed files
+            foreach (var change in changes.Where(c => c.Operation != ChangeOperation.Delete))
+            {
+                if (currentSnapshot.Files.TryGetValue(change.FilePath, out FileMetadata? metadata))
+                {
+                    currentSnapshot.Files[change.FilePath] = metadata with { Hash = change.Hash };
+                }
+            }
+        }
+
+        // Save updated snapshot
+        FileSystemSnapshot updatedSnapshot = currentSnapshot with
+        {
+            SequenceNumber = changeLog.CurrentSequence + changes.Count,
+            Timestamp = DateTime.UtcNow
+        };
+        await _changeLogService.SaveSnapshotAsync(updatedSnapshot, cancellationToken);
+
+        // Prune old changelog entries
+        await _changeLogService.PruneOldEntriesAsync(30, cancellationToken);
+
+        double elapsed = (DateTime.UtcNow - startTime).TotalMilliseconds;
+        _logger.LogInformation("Recheck completed in {Elapsed:F0}ms (detected {Count} changes)", elapsed, changes.Count);
+
+        return changes;
+    }
 }
