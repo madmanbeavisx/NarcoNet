@@ -454,7 +454,7 @@ public class SyncService
     ///     Perform an on-demand recheck of the configured sync paths, comparing
     ///     current filesystem state to the last saved snapshot. This is similar
     ///     to the startup detection logic but intended to be called at runtime
-    ///     (e.g. from an HTTP endpoint) and returns the detected changes.
+    ///     (e.g. from an HTTPS endpoint) and returns the detected changes.
     /// </summary>
     public async Task<List<FileChangeEntry>> RecheckAsync(
         List<SyncPath> syncPaths,
